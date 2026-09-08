@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-space: #F9FAFB;
+  --color-card-space: rgba(228, 228, 231, 0.85);
+  --color-card-light: rgba(228, 228, 231, 0.55);
+  --color-border-space: rgba(0, 0, 0, 0.14);
+  
+  /* Map brand colors to monochrome shades to gracefully handle any leftover variables in light mode */
+  --color-brand-cyan: #111827;
+  --color-brand-purple: #4B5563;
+  --color-brand-green: #1F2937;
+  --color-brand-red: #991B1B;
+  --color-brand-warn: #D97706;
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", monospace;
+  --font-display: "Inter", sans-serif;
+}
+
+html, body {
+  background-color: #F9FAFB;
+  color: #111827;
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Custom Window Drag & Interactive Areas */
+.titlebar-drag {
+  -webkit-app-region: drag;
+}
+
+.titlebar-nodrag {
+  -webkit-app-region: no-drag;
+}
+
+/* Glassmorphism Styles (Light Mode) */
+.glass-panel {
+  background: rgba(228, 228, 231, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.03);
+}
+
+.glass-panel-hover {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(209, 213, 219, 0.95);
+  border-color: rgba(0, 0, 0, 0.25);
+  transform: translateY(-4px) scale(1.015);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.03);
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  color: #111827;
+  transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: #111827;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Clean, solid canvas background (replaces the cyber space-grid-bg) */
+.space-grid-bg {
+  background-color: #F9FAFB;
+}
+
+/* Micro-animations and Glow utilities */
+.glow-text-cyan, .glow-text-purple, .glow-text-green {
+  text-shadow: none;
+}
+
+.shadow-cyan-glow, .shadow-purple-glow, .shadow-green-glow {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+/* Status dots indicator (Unified to professional solid dots) */
+.pulse-green, .pulse-cyan, .pulse-purple {
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Premium Primary Black Button Style */
+.btn-primary-white {
+  background-color: #111827;
+  color: #FFFFFF;
+  font-weight: 700;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border: 1px solid #111827;
+}
+.btn-primary-white:hover {
+  background-color: #1F2937;
+  border-color: #1F2937;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+.btn-primary-white:active {
+  transform: translateY(0) scale(0.98);
+}
+

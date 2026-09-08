@@ -1,0 +1,49 @@
+appId: com.spaceviewer.app
+productName: SpaceViewer
+copyright: "© 2026 SpaceViewer"
+
+publish:
+  provider: github
+  owner: admregionalvitoria-sudo
+  repo: spaceviwer
+
+directories:
+  output: release
+
+extraResources:
+  - from: resources/senaistream
+    to: senaistream
+
+files:
+  - out/**/*
+
+win:
+  icon: resources/icon.ico
+  requestedExecutionLevel: requireAdministrator
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: "SpaceViewer-Setup-${version}.${ext}"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: true
+  allowElevation: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: SpaceViewer
+  include: resources/installer/installer.nsh
+
+linux:
+  icon: resources/icon.png
+  target:
+    - deb
+      - AppImage
+  category: Network
+  description: Screen mirroring and casting over local network
+
+protocols:
+  - name: spaceviewer
+    schemes:
+      - spaceviewer
