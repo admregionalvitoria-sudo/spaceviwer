@@ -79,6 +79,7 @@ const api: ScreenFlowAPI = {
   // === AUTO-UPDATE ===
   checkForUpdates: () => ipcRenderer.invoke('updater:check'),
   downloadAndInstallUpdate: (downloadUrl: string) => ipcRenderer.invoke('updater:download-and-install', downloadUrl),
+  applyUpdateAndRestart: () => ipcRenderer.invoke('updater:apply-and-restart'),
   onUpdateProgress: (cb) => {
     const handler = (_: Electron.IpcRendererEvent, p: unknown) => cb(p as any);
     ipcRenderer.on('updater:progress', handler);

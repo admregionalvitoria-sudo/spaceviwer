@@ -19,7 +19,7 @@
   Pop $0
   ${If} $0 != "admin"
     # Auto-elevar com UAC para garantir instalacao dos drivers de video virtual
-    ExecShell "runas" "$EXEPATH"
+    ExecShell "runas" "$EXEPATH" "$CMDLINE"
     Quit
   ${EndIf}
 

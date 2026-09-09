@@ -17,6 +17,9 @@ export const Settings: React.FC = () => {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updateStatusText, setUpdateStatusText] = useState<string | null>(null);
   const [currentAppVersion, setCurrentAppVersion] = useState<string>(APP_VERSION);
+  const [updatePhase, setUpdatePhase] = useState<'idle' | 'downloading' | 'ready_to_restart' | 'applying'>('idle');
+  const [showRestartModal, setShowRestartModal] = useState(false);
+  const [isApplyingRestart, setIsApplyingRestart] = useState(false);
 
   // Form states
   const [port, setPort] = useState(settings.server.port);
@@ -58,7 +61,7 @@ export const Settings: React.FC = () => {
   const handleCheckForUpdates = async () => {
     setIsCheckingUpdate(true);
     setUpdateError(null);
-    setUpdateStatusText('Buscando atualizações no GitHub (spaceviwer)...');
+    setUpdateStatusText('Buscando novas atualizações do SpaceViewer...');
     try {
       if (!window.screenflow?.checkForUpdates) {
         throw new Error('Módulo de atualização não disponível no ambiente');
@@ -74,7 +77,7 @@ export const Settings: React.FC = () => {
         setUpdateStatusText(null);
       }
     } catch (err: any) {
-      setUpdateError(err.message || 'Falha ao buscar atualizações no repositório.');
+      setUpdateError(err.message || 'Falha ao buscar atualizações no servidor.');
       setUpdateStatusText(null);
     } finally {
       setIsCheckingUpdate(false);
@@ -90,16 +93,34 @@ export const Settings: React.FC = () => {
       return;
     }
     setIsDownloadingUpdate(true);
+    setUpdatePhase('downloading');
     setUpdateError(null);
     try {
       const res = await window.screenflow.downloadAndInstallUpdate(updateInfo.downloadUrl);
-      if (!res.success && res.error) {
+      if (res.success) {
+        setUpdatePhase('ready_to_restart');
+        setShowRestartModal(true);
+      } else if (res.error) {
         setUpdateError(res.error);
+        setUpdatePhase('idle');
         setIsDownloadingUpdate(false);
       }
     } catch (err: any) {
-      setUpdateError(err.message || 'Falha ao instalar a atualização');
+      setUpdateError(err.message || 'Falha ao baixar a atualização');
+      setUpdatePhase('idle');
       setIsDownloadingUpdate(false);
+    }
+  };
+
+  const handleApplyAndRestart = async () => {
+    setIsApplyingRestart(true);
+    setUpdatePhase('applying');
+    try {
+      await window.screenflow.applyUpdateAndRestart();
+    } catch (err: any) {
+      setUpdateError(err.message || 'Falha ao iniciar reinicialização');
+      setIsApplyingRestart(false);
+      setUpdatePhase('ready_to_restart');
     }
   };
 
@@ -365,7 +386,7 @@ export const Settings: React.FC = () => {
                         Atualização do SpaceViewer
                       </h3>
                       <p className="text-xs text-neutral-500 mt-0.5">
-                        Verifique e instale novas versões diretamente do GitHub sem reinstalar manualmente.
+                        Verifique e instale novas versões com facilidade sem reinstalar manualmente.
                       </p>
                     </div>
                     <span className="px-3 py-1 bg-neutral-100 text-neutral-900 border border-neutral-300/80 rounded-full font-mono text-xs font-bold">
@@ -382,15 +403,15 @@ export const Settings: React.FC = () => {
                           </svg>
                         </div>
                         <div>
-                          <div className="text-xs font-bold text-neutral-900 uppercase tracking-wide">Repositório Oficial</div>
-                          <div className="text-[11px] font-mono text-neutral-500">github.com/admregionalvitoria-sudo/spaceviwer</div>
+                          <div className="text-xs font-bold text-neutral-900 uppercase tracking-wide">Servidor de Atualizações</div>
+                          <div className="text-[11px] font-mono text-neutral-500">Canal Oficial · Conexão Segura</div>
                         </div>
                       </div>
 
                       <button
                         type="button"
                         onClick={handleCheckForUpdates}
-                        disabled={isCheckingUpdate || isDownloadingUpdate}
+                        disabled={isCheckingUpdate || isDownloadingUpdate || updatePhase === 'applying'}
                         className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center space-x-2 cursor-pointer"
                       >
                         {isCheckingUpdate ? (
@@ -448,7 +469,7 @@ export const Settings: React.FC = () => {
                           </p>
                         </div>
 
-                        {!isDownloadingUpdate && (
+                        {updatePhase === 'idle' && (
                           <button
                             type="button"
                             onClick={handleDownloadAndInstall}
@@ -462,13 +483,13 @@ export const Settings: React.FC = () => {
                         )}
                       </div>
 
-                      {updateInfo.releaseNotes && (
+                      {updateInfo.releaseNotes && updatePhase === 'idle' && (
                         <div className="bg-neutral-950/60 rounded-xl p-3.5 border border-neutral-800/80 text-xs text-neutral-300 max-h-36 overflow-y-auto whitespace-pre-wrap font-sans">
                           {updateInfo.releaseNotes}
                         </div>
                       )}
 
-                      {isDownloadingUpdate && (
+                      {updatePhase === 'downloading' && (
                         <div className="space-y-2 pt-2 border-t border-neutral-800">
                           <div className="flex justify-between text-xs font-mono">
                             <span className="text-neutral-400 flex items-center space-x-1.5">
@@ -483,7 +504,7 @@ export const Settings: React.FC = () => {
                             </span>
                           </div>
 
-                          <div className="w-full bg-neutral-800 h-2 rounded-full overflow-hidden">
+                          <div className="w-full bg-neutral-800 h-2.5 rounded-full overflow-hidden">
                             <div
                               className="bg-emerald-500 h-full rounded-full transition-all duration-300"
                               style={{ width: `${downloadProgress ? downloadProgress.percent : 5}%` }}
@@ -502,10 +523,61 @@ export const Settings: React.FC = () => {
                                 : ''}
                             </span>
                           </div>
+                        </div>
+                      )}
 
-                          <p className="text-[11px] text-neutral-400 italic pt-1">
-                            O instalador atualizará o SpaceViewer automaticamente sem que você precise desinstalar. O aplicativo reiniciará em instantes.
+                      {(updatePhase === 'ready_to_restart' || (isDownloadingUpdate && downloadProgress && downloadProgress.percent >= 100)) && (
+                        <div className="bg-emerald-950/60 border border-emerald-500/40 rounded-xl p-4 space-y-3">
+                          <div className="flex items-center space-x-2.5 text-emerald-300">
+                            <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                              <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                            <span className="font-bold text-xs uppercase tracking-wide">Download Concluído com Sucesso</span>
+                          </div>
+                          <p className="text-xs text-neutral-300">
+                            A nova versão v{updateInfo.latestVersion} foi baixada e verificada. Reinicie o SpaceViewer agora para concluir a instalação.
                           </p>
+                          <div className="flex items-center space-x-3 pt-1">
+                            <button
+                              type="button"
+                              onClick={handleApplyAndRestart}
+                              disabled={isApplyingRestart}
+                              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs uppercase tracking-wider rounded-xl transition shadow cursor-pointer flex items-center space-x-2"
+                            >
+                              {isApplyingRestart ? (
+                                <>
+                                  <div className="w-3.5 h-3.5 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin" />
+                                  <span>Iniciando Instalação...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                  <span>Reiniciar e Instalar Agora</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowRestartModal(true)}
+                              className="text-xs text-neutral-400 hover:text-white underline cursor-pointer"
+                            >
+                              Ver Detalhes
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {updatePhase === 'applying' && (
+                        <div className="p-4 bg-neutral-950/80 border border-neutral-800 rounded-xl flex items-center space-x-3">
+                          <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                          <div>
+                            <div className="text-xs font-bold text-white">Instalando Nova Versão...</div>
+                            <div className="text-[11px] text-neutral-400">O SpaceViewer reiniciará automaticamente em alguns instantes.</div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -515,6 +587,60 @@ export const Settings: React.FC = () => {
                     <div className="font-bold text-neutral-700 uppercase tracking-wider text-[10px]">Informações sobre Atualizações:</div>
                     <div>• O instalador aplica a nova versão sobre a versão atual preservando suas configurações e atalhos.</div>
                     <div>• Não é necessário desinstalar o programa para atualizar para versões mais recentes.</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal de confirmação para reiniciar o app */}
+              {showRestartModal && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 text-neutral-900 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-sm">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="text-center space-y-1.5">
+                      <h3 className="font-display font-extrabold text-base uppercase tracking-wider text-neutral-900">
+                        Atualização Pronta para Instalar
+                      </h3>
+                      <p className="text-xs text-neutral-600">
+                        A nova versão do SpaceViewer (v{updateInfo?.latestVersion}) foi baixada com sucesso.
+                      </p>
+                      <p className="text-xs text-neutral-500 pt-1">
+                        O aplicativo será reiniciado para concluir a instalação no sistema. Confirme a permissão de administrador no Windows caso seja solicitada.
+                      </p>
+                    </div>
+                    <div className="flex flex-col space-y-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleApplyAndRestart}
+                        disabled={isApplyingRestart}
+                        className="w-full py-3 bg-neutral-900 hover:bg-neutral-850 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition shadow-md flex items-center justify-center space-x-2 cursor-pointer"
+                      >
+                        {isApplyingRestart ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Iniciando Instalação...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span>Reiniciar e Concluir Instalação</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowRestartModal(false)}
+                        disabled={isApplyingRestart}
+                        className="w-full py-2 text-xs text-neutral-500 hover:text-neutral-800 font-semibold uppercase tracking-wider transition cursor-pointer"
+                      >
+                        Lembrar Mais Tarde
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

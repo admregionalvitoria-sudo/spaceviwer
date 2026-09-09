@@ -19,7 +19,7 @@ files:
 
 win:
   icon: resources/icon.ico
-  requestedExecutionLevel: requireAdministrator
+  requestedExecutionLevel: asInvoker
   target:
     - target: nsis
       arch: [x64]

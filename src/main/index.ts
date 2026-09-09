@@ -51,7 +51,7 @@ import {
 } from './gamestream-host';
 import { AgentServer } from './agent-server';
 import { TVDiscovery } from './tv-discovery';
-import { checkForAppUpdates, downloadAndInstallUpdate } from './updater';
+import { checkForAppUpdates, downloadAndInstallUpdate, applyUpdateAndRestart } from './updater';
 import type { AppSettings, InstallMode, MasterInfo } from '../shared/types';
 import { DEFAULT_SETTINGS, APP_VERSION } from '../shared/constants';
 
@@ -700,6 +700,10 @@ function registerIpcHandlers() {
         mainWindow.webContents.send('updater:progress', progress);
       }
     });
+  });
+
+  ipcMain.handle('updater:apply-and-restart', async () => {
+    return await applyUpdateAndRestart();
   });
 
   // Window actions

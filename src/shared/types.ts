@@ -342,6 +342,7 @@ export interface ScreenFlowAPI {
   // Auto-Update
   checkForUpdates: () => Promise<UpdateInfo>;
   downloadAndInstallUpdate: (downloadUrl: string) => Promise<{ success: boolean; error?: string }>;
+  applyUpdateAndRestart: () => Promise<{ success: boolean; error?: string }>;
   onUpdateProgress: (cb: (progress: UpdateProgress) => void) => () => void;
 
   // Events

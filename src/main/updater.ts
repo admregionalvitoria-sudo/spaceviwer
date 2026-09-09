@@ -69,7 +69,7 @@ function fetchJson(url: string): Promise<any> {
       }
 
       if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
-        return reject(new Error(`GitHub API returned status code ${res.statusCode}`));
+        return reject(new Error(`Servidor de atualizações retornou código ${res.statusCode}`));
       }
 
       let data = '';
@@ -78,7 +78,7 @@ function fetchJson(url: string): Promise<any> {
         try {
           resolve(JSON.parse(data));
         } catch (e) {
-          reject(new Error('Falha ao processar resposta do GitHub'));
+          reject(new Error('Falha ao processar resposta do servidor de atualizações'));
         }
       });
     });
@@ -104,7 +104,7 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
         currentVersion,
         latestVersion: currentVersion,
         releaseName: 'Versão mais recente',
-        releaseNotes: 'Nenhuma versão mais recente publicada no repositório GitHub ainda.',
+        releaseNotes: 'O SpaceViewer já está atualizado com a versão mais recente.',
         releaseDate: new Date().toISOString(),
       };
     }
@@ -149,7 +149,7 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
       releaseName: 'Erro ao verificar',
       releaseNotes: '',
       releaseDate: '',
-      error: err.message || 'Não foi possível conectar ao GitHub.',
+      error: err.message || 'Não foi possível conectar ao servidor de atualizações.',
     };
   }
 }
@@ -252,25 +252,73 @@ export async function downloadAndInstallUpdate(
       if (onProgress) onProgress(p);
     });
 
-    console.log('[Updater] Download concluído! Executando instalador NSIS para atualização in-place...');
+    console.log('[Updater] Download concluído! Arquivo do instalador pronto para aplicação.');
+    return { success: true };
+  } catch (err: any) {
+    console.error('[Updater] Erro ao baixar atualização:', err);
+    return { success: false, error: err.message || 'Falha ao baixar atualização' };
+  }
+}
 
-    // Execute the NSIS installer silently with /S or standard elevation
-    // /S executes seamless upgrade in-place without manual uninstallation
-    const child = spawn(installerFile, ['/S'], {
+export async function applyUpdateAndRestart(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const tempDir = app.getPath('temp');
+    const installerFile = path.join(tempDir, `SpaceViewer-Update-Setup.exe`);
+
+    if (!fs.existsSync(installerFile)) {
+      return { success: false, error: 'Arquivo do instalador não encontrado.' };
+    }
+
+    console.log(`[Updater] Preparando script de reinício e execução do instalador: ${installerFile}`);
+
+    const batFile = path.join(tempDir, 'spaceviewer_apply_update.bat');
+    const escapedInstaller = installerFile.replace(/"/g, '');
+
+    const batContent = `@echo off
+setlocal
+echo [SpaceViewer] Aguardando encerramento do aplicativo...
+timeout /t 2 /nobreak >nul
+taskkill /F /IM SpaceViewer.exe >nul 2>&1
+taskkill /F /IM SenaiStream.exe >nul 2>&1
+taskkill /F /IM SenaiStreamDisplayCtl.exe >nul 2>&1
+
+echo [SpaceViewer] Executando instalador da nova versao com elevacao de Administrador...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '${escapedInstaller}' -Verb RunAs -Wait"
+
+echo [SpaceViewer] Instalacao concluida! Reiniciando SpaceViewer...
+timeout /t 1 /nobreak >nul
+if exist "%LOCALAPPDATA%\\Programs\\SpaceViewer\\SpaceViewer.exe" (
+    start "" "%LOCALAPPDATA%\\Programs\\SpaceViewer\\SpaceViewer.exe"
+    exit
+)
+if exist "C:\\Program Files\\SpaceViewer\\SpaceViewer.exe" (
+    start "" "C:\\Program Files\\SpaceViewer\\SpaceViewer.exe"
+    exit
+)
+if exist "%PROGRAMFILES%\\SpaceViewer\\SpaceViewer.exe" (
+    start "" "%PROGRAMFILES%\\SpaceViewer\\SpaceViewer.exe"
+    exit
+)
+exit
+`;
+    fs.writeFileSync(batFile, batContent, 'utf-8');
+
+    // Spawn the batch launcher detached
+    const child = spawn('cmd.exe', ['/c', batFile], {
       detached: true,
       stdio: 'ignore',
+      windowsHide: true,
     });
-
     child.unref();
 
-    // Give 1.5 seconds for installer to initialize, then exit cleanly
+    // Exit app cleanly after 600ms so batch script can take over
     setTimeout(() => {
-      app.quit();
-    }, 1500);
+      app.exit(0);
+    }, 600);
 
     return { success: true };
   } catch (err: any) {
-    console.error('[Updater] Erro ao baixar ou executar atualização:', err);
-    return { success: false, error: err.message || 'Falha ao instalar atualização' };
+    console.error('[Updater] Erro ao executar script de atualização:', err);
+    return { success: false, error: err.message || 'Falha ao iniciar instalador.' };
   }
 }

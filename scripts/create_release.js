@@ -46,8 +46,8 @@ async function main() {
   }, {
     tag_name: `v${VERSION}`,
     target_commitish: 'main',
-    name: `SpaceViewer v${VERSION} - Múltiplas Telas no Moonlight e Correção de Firewall`,
-    body: `### Novidades da Versão ${VERSION}\n\n- **Identificação no Moonlight**: O prefixo foi ajustado para 'SpaceViewer - [Nome do Computador]'.\n- **Suporte a Múltiplas Telas Virtuais**: Expansão do driver para até 4 telas virtuais independentes para transmissão para múltiplos Moonlights/Smart TVs simultaneamente.\n- **Correção de Firewall (UDP 47999)**: Regras universais liberando portas UDP 47998-48010 e TCP 47984, 47989, 48010 eliminando o Erro 11.\n- **Detecção Aprimorada de Janelas**: Detecção de aplicativos abertos e minimizados na função 'Mover Janela' com botão de atualização.\n\nInstalador executável em anexo.`,
+    name: `SpaceViewer v${VERSION} - Atualização com Elevação UAC e Reinício Automático`,
+    body: `### Novidades da Versão ${VERSION}\n\n- **Atualizador Automático Aprimorado**: Correção de elevação UAC no Windows permitindo que versões anteriores atualizem sem fechar silenciosamente.\n- **Interface Limpa e Profissional**: Remoção de referências externas na aba de Ajustes para uma experiência nativa e integrada.\n- **Notificação e Reinício Transparente**: Exibição da barra de instalação e solicitação intuitiva para reiniciar o aplicativo.\n- **Suporte a Múltiplas Telas Virtuais**: Expansão do driver para até 4 telas virtuais independentes para transmissão para múltiplos Moonlights/Smart TVs simultaneamente.\n- **Regras de Firewall Otimizadas**: Conectividade direta de portas de streaming sem bloqueios.\n\nInstalador executável em anexo.`,
     draft: false,
     prerelease: false
   });
