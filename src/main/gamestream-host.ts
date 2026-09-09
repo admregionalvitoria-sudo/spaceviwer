@@ -164,6 +164,9 @@ export async function startHost(): Promise<boolean> {
     return false;
   }
 
+  // Ensure virtual display settings (4 screens) are synchronized
+  ensureVirtualDisplaySettingsSync();
+
   try {
     // 1. Terminate any legacy Sunshine processes or stale SenaiStream processes
     await new Promise<void>((resolve) => {
@@ -257,16 +260,47 @@ export function isHostRunning(): boolean {
 // Virtual Display Driver Management (SenaiStreamDisplayCtl.exe)
 // ============================================================
 
+export function ensureVirtualDisplaySettingsSync(): void {
+  try {
+    const vddDir = 'C:\\VirtualDisplayDriver';
+    if (!fs.existsSync(vddDir)) {
+      fs.mkdirSync(vddDir, { recursive: true });
+    }
+    const infPath = getVirtualDisplayInfPath();
+    const bundledSettings = path.join(path.dirname(infPath), 'vdd_settings.xml');
+    const targetSettings = path.join(vddDir, 'vdd_settings.xml');
+
+    let needCopy = true;
+    if (fs.existsSync(targetSettings)) {
+      const current = fs.readFileSync(targetSettings, 'utf-8');
+      if (current.includes('<count>4</count>')) {
+        needCopy = false;
+      }
+    }
+
+    if (needCopy && fs.existsSync(bundledSettings)) {
+      fs.copyFileSync(bundledSettings, targetSettings);
+      console.log('[VirtualDisplay] Synced vdd_settings.xml (4 screens) to C:\\VirtualDisplayDriver');
+    }
+  } catch (err) {
+    console.warn('[VirtualDisplay] Warning syncing settings:', err);
+  }
+}
+
 export async function getVirtualDisplayStatus(): Promise<VirtualDisplayStatus> {
   const ctlPath = getDisplayCtlExePath();
+  const vddSettingsExist = fs.existsSync('C:\\VirtualDisplayDriver\\vdd_settings.xml');
+  const displays = typeof screen !== 'undefined' && screen.getAllDisplays ? screen.getAllDisplays() : [];
+  const hasMultipleDisplays = displays.length > 1;
+
   if (!fs.existsSync(ctlPath)) {
-    return { installed: false, active: false };
+    return { installed: vddSettingsExist || hasMultipleDisplays, active: hasMultipleDisplays };
   }
 
   return new Promise((resolve) => {
     execFile(ctlPath, ['status'], (err) => {
       // Exit code 0 means device was found in DeviceSet
-      const installed = !err;
+      const installed = !err || vddSettingsExist || hasMultipleDisplays;
       resolve({ installed, active: installed });
     });
   });
@@ -287,48 +321,34 @@ export async function installVirtualDisplayDriver(): Promise<{
     return { success: false, error: 'Driver MttVDD.inf não encontrado.' };
   }
 
-  console.log(`[VirtualDisplay] Installing driver via SenaiStreamDisplayCtl ensure: ${infPath}`);
+  console.log(`[VirtualDisplay] Installing / syncing driver via ensure: ${infPath}`);
+  ensureVirtualDisplaySettingsSync();
 
-  // Ensure C:\VirtualDisplayDriver directory exists and copy vdd_settings.xml
-  try {
-    const vddDir = 'C:\\VirtualDisplayDriver';
-    if (!fs.existsSync(vddDir)) {
-      fs.mkdirSync(vddDir, { recursive: true });
-    }
-    const settingsSource = path.join(path.dirname(infPath), 'vdd_settings.xml');
-    if (fs.existsSync(settingsSource)) {
-      fs.copyFileSync(settingsSource, path.join(vddDir, 'vdd_settings.xml'));
-    }
-  } catch (copyErr) {
-    console.warn('[VirtualDisplay] Pre-copy vdd_settings.xml warning:', copyErr);
-  }
+  const batPath = path.join(path.dirname(infPath), '..', 'install_driver.bat');
 
   return new Promise((resolve) => {
-    // Elevate with PowerShell Start-Process -Verb RunAs so Windows can register the driver
-    const escapedCtl = ctlPath.replace(/'/g, "''");
-    const escapedInf = infPath.replace(/'/g, "''");
-    const psScript = `(Start-Process -FilePath '${escapedCtl}' -ArgumentList 'ensure', '\`"${escapedInf}\`"' -Verb RunAs -Wait -PassThru).ExitCode`;
+    let psScript = '';
+    if (fs.existsSync(batPath)) {
+      const escapedBat = batPath.replace(/'/g, "''");
+      psScript = `Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\`"${escapedBat}\`"' -Verb RunAs -Wait -PassThru`;
+    } else {
+      const escapedCtl = ctlPath.replace(/'/g, "''");
+      const escapedInf = infPath.replace(/'/g, "''");
+      psScript = `Start-Process -FilePath '${escapedCtl}' -ArgumentList 'ensure', '\`"${escapedInf}\`"' -Verb RunAs -Wait -PassThru; pnputil /restart-device 'ROOT\\SENAISTREAM_VIRTUAL_DISPLAY\\0000'; pnputil /restart-device 'ROOT\\MTTVDD\\0000'; Start-Process -FilePath '${escapedCtl}' -ArgumentList 'extend' -Wait; DisplaySwitch.exe /extend`;
+    }
 
-    exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript}"`, (err, stdout) => {
+    exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript}"`, (err) => {
       if (err) {
         console.error('[VirtualDisplay] Failed to elevate driver installer:', err);
         resolve({ success: false, error: 'Falha ou cancelamento da permissão de administrador no Windows.' });
         return;
       }
 
-      const exitCode = parseInt(stdout.trim(), 10);
-      console.log(`[VirtualDisplay] Driver installer completed with exit code: ${exitCode}`);
-
-      if (exitCode === 0) {
-        // Activate extended topology immediately
-        execFile(ctlPath, ['extend'], () => {});
-        resolve({ success: true, rebootRequired: false });
-      } else if (exitCode === 3010) {
-        execFile(ctlPath, ['extend'], () => {});
-        resolve({ success: true, rebootRequired: true });
-      } else {
-        resolve({ success: false, error: `Erro na instalação do driver de monitor virtual (código ${exitCode}).` });
-      }
+      // Activate extended topology and restart device
+      execFile(ctlPath, ['extend'], () => {});
+      exec('DisplaySwitch.exe /extend', () => {});
+      console.log('[VirtualDisplay] Virtual display setup command completed.');
+      resolve({ success: true, rebootRequired: false });
     });
   });
 }

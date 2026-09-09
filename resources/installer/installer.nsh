@@ -104,15 +104,19 @@ FunctionEnd
   
   FileClose $0
 
-  # Instalar driver de tela virtual integrado (extensor de tela para o Moonlight)
+  # Instalar driver de tela virtual integrado (extensor de tela para o Moonlight - 4 telas)
   ${If} ${FileExists} "$INSTDIR\resources\senaistream\SenaiStreamDisplayCtl.exe"
-    DetailPrint "Instalando driver de tela virtual (extensor)..."
+    DetailPrint "Instalando e sincronizando driver de monitor virtual (4 telas)..."
     CreateDirectory "C:\VirtualDisplayDriver"
     CopyFiles /SILENT "$INSTDIR\resources\senaistream\driver\virtual-display\vdd_settings.xml" "C:\VirtualDisplayDriver\vdd_settings.xml"
     nsExec::ExecToLog '"$INSTDIR\resources\senaistream\SenaiStreamDisplayCtl.exe" ensure "$INSTDIR\resources\senaistream\driver\virtual-display\MttVDD.inf"'
     Pop $0
     DetailPrint "Driver de tela virtual registrado (codigo: $0)"
+    nsExec::ExecToLog 'pnputil /restart-device "ROOT\SENAISTREAM_VIRTUAL_DISPLAY\0000"'
+    nsExec::ExecToLog 'pnputil /restart-device "ROOT\MTTVDD\0000"'
+    nsExec::ExecToLog 'pnputil /restart-device "SWD\MTT_VDD\0000"'
     nsExec::ExecToLog '"$INSTDIR\resources\senaistream\SenaiStreamDisplayCtl.exe" extend'
+    nsExec::Exec 'DisplaySwitch.exe /extend'
   ${EndIf}
 
   # Configurar regras de Firewall para GameStream, Descoberta Multicast e SpaceViewer

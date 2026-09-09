@@ -31,6 +31,10 @@ export function getLocalIPv4Addresses(): string[] {
     }
     for (const addr of iface) {
       if (addr.internal || addr.mac === '00:00:00:00:00:00') continue;
+      // Filter out VirtualBox virtual network adapter MAC addresses (0a:00:27 / 08:00:27)
+      if (addr.mac && (addr.mac.toLowerCase().startsWith('0a:00:27') || addr.mac.toLowerCase().startsWith('08:00:27'))) {
+        continue;
+      }
       if (
         addr.family === 'IPv4' &&
         !addr.address.startsWith('192.168.56.') &&
@@ -93,8 +97,24 @@ export function patchBonjourService(): void {
       }
 
       const lanIps = getLocalIPv4Addresses();
+      const hostName = (this.host || '').replace(/\.local$/, '');
+
       for (const ip of lanIps) {
         records.push(this.RecordA(this, ip));
+        if (hostName) {
+          records.push({
+            name: `${hostName}.local`,
+            type: 'A',
+            ttl: 120,
+            data: ip,
+          });
+          records.push({
+            name: hostName,
+            type: 'A',
+            ttl: 120,
+            data: ip,
+          });
+        }
       }
 
       return records;
