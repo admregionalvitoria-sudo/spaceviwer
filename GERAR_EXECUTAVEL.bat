@@ -51,8 +51,8 @@ echo ====================================================================
 echo   CONCLUIDO COM SUCESSO!
 echo.
 echo   Instalador gerado com permissao de Administrador (perMachine: true):
-echo   - dist-installer\SpaceViewer-Setup-2.2.1.exe
-echo   - dist-electron\SpaceViewer-Setup-2.2.1.exe
+echo   - dist-installer\SpaceViewer-Setup-2.2.2.exe
+echo   - dist-electron\SpaceViewer-Setup-2.2.2.exe
 echo.
 echo   O instalador ira registrar automaticamente o Driver de Tela Virtual
 echo   (MTT VDD) para que o Moonlight funcione no modo TELA ESTENDIDA!

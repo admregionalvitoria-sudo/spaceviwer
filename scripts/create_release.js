@@ -29,7 +29,7 @@ function request(options, data = null) {
 }
 
 async function main() {
-  console.log('Criando release v2.2.1 no GitHub...');
+  console.log('Criando release v2.2.2 no GitHub...');
   const releaseRes = await request({
     hostname: 'api.github.com',
     path: '/repos/admregionalvitoria-sudo/spaceviwer/releases',
@@ -41,10 +41,10 @@ async function main() {
       'Accept': 'application/vnd.github.v3+json'
     }
   }, {
-    tag_name: 'v2.2.1',
+    tag_name: 'v2.2.2',
     target_commitish: 'main',
-    name: 'SpaceViewer v2.2.1 - Atualização de Design e Telas',
-    body: `### Novidades da Versão 2.2.1\n\n- **Remoção Total de Emojis**: Interface 100% limpa com ícones vetoriais modernos (SVG).\n- **Ícone do Moonlight Atualizado**: Novo ícone em silhueta de lua crescente.\n- **Auto-Update Integrado**: Atualize diretamente pela aba de Ajustes/Configurações sem precisar reinstalar.\n- **Gerenciador de Telas como Início**: Monitoramento ao vivo de todas as telas físicas e virtuais.\n- **Transmissão Seletiva de Aplicativos**: Envie janelas de programas específicos para telas secundárias.\n\nInstalador executável em anexo.`,
+    name: 'SpaceViewer v2.2.2 - Correção de Transmissão e Atualização In-Place',
+    body: `### Novidades da Versão 2.2.2\n\n- **Correção Fatal de Objeto Destruído**: Corrigida exceção 'TypeError: Object has been destroyed' ao fechar ou interromper projeções.\n- **Captura Resiliente de Janelas**: Adicionada restauração automática de janelas minimizadas no Windows DWM e fallback adaptável para o getUserMedia.\n- **Mover Janela Aperfeiçoado**: Suporte a movimentação precisa de janelas via HWND nativo.\n- **Atualização In-Place Sem Desinstalar**: O instalador agora encerra automaticamente processos em segundo plano para atualização direta.\n\nInstalador executável em anexo.`,
     draft: false,
     prerelease: false
   });
@@ -55,7 +55,7 @@ async function main() {
     console.log('Buscando release existente...');
     const latest = await request({
       hostname: 'api.github.com',
-      path: '/repos/admregionalvitoria-sudo/spaceviwer/releases/tags/v2.2.1',
+      path: '/repos/admregionalvitoria-sudo/spaceviwer/releases/tags/v2.2.2',
       method: 'GET',
       headers: {
         'User-Agent': 'SpaceViewer-App',
@@ -67,9 +67,9 @@ async function main() {
   }
 
   if (uploadUrl) {
-    const finalUploadUrl = uploadUrl.replace('{?name,label}', '?name=SpaceViewer-Setup-2.2.1.exe');
+    const finalUploadUrl = uploadUrl.replace('{?name,label}', '?name=SpaceViewer-Setup-2.2.2.exe');
     const parsed = new URL(finalUploadUrl);
-    const exePath = path.resolve(__dirname, '../release/SpaceViewer-Setup-2.2.1.exe');
+    const exePath = path.resolve(__dirname, '../release/SpaceViewer-Setup-2.2.2.exe');
     if (!fs.existsSync(exePath)) {
       console.error('Arquivo executavel nao encontrado em:', exePath);
       return;

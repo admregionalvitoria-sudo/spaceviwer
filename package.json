@@ -1,6 +1,6 @@
 {
   "name": "spaceviewer",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Screen mirroring and casting over local network",
   "repository": {
     "type": "git",

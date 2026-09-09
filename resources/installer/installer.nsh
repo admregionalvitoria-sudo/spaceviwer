@@ -23,6 +23,11 @@
     Quit
   ${EndIf}
 
+  # Fechar instancias ativas do SpaceViewer e SenaiStream para permitir atualizacao in-place sem travar arquivos
+  nsExec::Exec 'taskkill /F /IM SpaceViewer.exe /T'
+  nsExec::Exec 'taskkill /F /IM SenaiStream.exe /T'
+  nsExec::Exec 'taskkill /F /IM SenaiStreamDisplayCtl.exe /T'
+
   !ifndef BUILD_UNINSTALLER
     StrCpy $SelectedMode "both"
   !endif
