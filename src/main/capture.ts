@@ -3,6 +3,7 @@
 // ============================================================
 
 import { desktopCapturer, screen } from 'electron';
+import { exec } from 'child_process';
 import type { AppWindowSource, DetailedScreenInfo, ScreenSource } from '../shared/types';
 import { getActiveProjectors } from './projector';
 import { getVirtualDisplayStatus, getSunshineConfig } from './gamestream-host';
@@ -51,9 +52,6 @@ export async function getScreensDetailed(): Promise<DetailedScreenInfo[]> {
 
     return displays.map((disp, idx) => {
       const isPrimary = disp.id === primaryDisplay.id;
-      // Match with desktopCapturer source:
-      // 1. By display_id matching disp.id
-      // 2. By index (e.g. screen:0:0 for display 0)
       let matchedSource = sources.find((s) => s.display_id === disp.id.toString());
       if (!matchedSource) {
         matchedSource = sources[idx] || sources[0];
@@ -62,12 +60,11 @@ export async function getScreensDetailed(): Promise<DetailedScreenInfo[]> {
       const sourceId = matchedSource?.id || `screen:${idx}:0`;
       const isVirtual = !isPrimary && (virtualInstalled || idx > 0);
 
-      // Check if this screen is the target for Moonlight
+      // Check if this screen is specifically targeted by Moonlight
       const isMoonlightTarget = Boolean(
         moonlightConfig &&
           (moonlightConfig.selectedSourceId === sourceId ||
-            (isVirtual && moonlightConfig.captureDisplayIndex === idx) ||
-            (!isPrimary && moonlightConfig.captureDisplayIndex > 0))
+           moonlightConfig.captureDisplayIndex === idx)
       );
 
       const projected = activeProjectors[disp.id.toString()] || null;
@@ -79,7 +76,7 @@ export async function getScreensDetailed(): Promise<DetailedScreenInfo[]> {
       const name = isPrimary
         ? `Tela 1 — Monitor Principal (${resW}×${resH})`
         : isVirtual
-        ? `Tela ${idx + 1} — Monitor Virtual Moonlight (${resW}×${resH})`
+        ? `Tela ${idx + 1} — Monitor Virtual ${idx} (${resW}×${resH})`
         : `Tela ${idx + 1} — Monitor Secundário (${resW}×${resH})`;
 
       return {
@@ -104,34 +101,87 @@ export async function getScreensDetailed(): Promise<DetailedScreenInfo[]> {
 
 /**
  * Lists all running application windows on the PC for casting to displays.
+ * Includes visible and minimized windows, with fallback to active process windows.
  */
 export async function getAppWindows(): Promise<AppWindowSource[]> {
-  try {
-    const sources = await desktopCapturer.getSources({
-      types: ['window'],
-      thumbnailSize: { width: 480, height: 270 },
-      fetchWindowIcons: true,
-    });
+  const result: AppWindowSource[] = [];
+  const seenNames = new Set<string>();
 
-    return sources
-      .filter((s) => {
-        // Exclude SpaceViewer's own windows to avoid infinite hall of mirrors
-        const lower = s.name.toLowerCase();
-        if (!lower || lower.trim() === '') return false;
-        if (lower.includes('spaceviewer') || lower.includes('space viewer')) return false;
-        if (lower === 'program manager' || lower === 'task switching') return false;
-        return true;
-      })
-      .map((s) => ({
+  try {
+    let sources: Electron.DesktopCapturerSource[] = [];
+    try {
+      sources = await desktopCapturer.getSources({
+        types: ['window'],
+        thumbnailSize: { width: 320, height: 180 },
+        fetchWindowIcons: true,
+      });
+    } catch {
+      sources = await desktopCapturer.getSources({
+        types: ['window'],
+        thumbnailSize: { width: 1, height: 1 },
+        fetchWindowIcons: false,
+      });
+    }
+
+    for (const s of sources) {
+      const lower = s.name.toLowerCase().trim();
+      if (!lower) continue;
+      if (lower.includes('spaceviewer') || lower.includes('space viewer')) continue;
+      if (lower === 'program manager' || lower === 'task switching' || lower === 'settings') continue;
+
+      seenNames.add(lower);
+      result.push({
         id: s.id,
         name: s.name,
         appIcon: s.appIcon ? s.appIcon.toDataURL() : null,
-        thumbnail: s.thumbnail.toDataURL(),
-      }));
+        thumbnail: s.thumbnail ? s.thumbnail.toDataURL() : '',
+      });
+    }
   } catch (err) {
-    console.error('[Capture] Error getting app windows:', err);
-    return [];
+    console.warn('[Capture] desktopCapturer window search notice:', err);
   }
+
+  // Complement with open desktop processes (detects minimized windows, browsers, office, etc.)
+  try {
+    if (process.platform === 'win32') {
+      const psScript = `
+        Get-Process | Where-Object { $_.MainWindowTitle -and $_.MainWindowTitle.Trim() -ne '' } | ForEach-Object {
+          $_.MainWindowHandle.ToString() + '|||' + $_.MainWindowTitle.Trim() + '|||' + $_.ProcessName
+        }
+      `;
+      const b64 = Buffer.from(psScript, 'utf16le').toString('base64');
+      const stdout = await new Promise<string>((resolve) => {
+        exec(`powershell -NoProfile -NonInteractive -EncodedCommand ${b64}`, (err, out) => {
+          resolve(out || '');
+        });
+      });
+
+      const lines = stdout.split(/\r?\n/);
+      for (const line of lines) {
+        const parts = line.split('|||');
+        if (parts.length >= 2) {
+          const hwnd = parts[0].trim();
+          const title = parts[1].trim();
+          const lower = title.toLowerCase();
+
+          if (!title || lower.includes('spaceviewer') || lower.includes('program manager') || lower.includes('settings')) continue;
+          if (seenNames.has(lower)) continue;
+
+          seenNames.add(lower);
+          result.push({
+            id: `window:${hwnd}`,
+            name: title,
+            appIcon: null,
+            thumbnail: '',
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Capture] Fallback process window enumeration notice:', err);
+  }
+
+  return result;
 }
 
 /**

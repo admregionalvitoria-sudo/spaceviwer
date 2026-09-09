@@ -133,6 +133,8 @@ FunctionEnd
     nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer SenaiStream TCP" dir=in action=allow profile=any protocol=TCP localport=47984,47989,48010 program="$INSTDIR\resources\senaistream\SenaiStream.exe" enable=yes'
     nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer SenaiStream UDP" dir=in action=allow profile=any protocol=UDP localport=47998-48010 program="$INSTDIR\resources\senaistream\SenaiStream.exe" enable=yes'
   ${EndIf}
+  nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer GameStream Ports TCP" dir=in action=allow profile=any protocol=TCP localport=47984,47989,48010 enable=yes'
+  nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer GameStream Ports UDP" dir=in action=allow profile=any protocol=UDP localport=47998-48010 enable=yes'
 
   # Liberar portas de descoberta mDNS (5353) e SSDP (1900)
   nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer Discovery UDP" dir=in action=allow profile=any protocol=UDP localport=5353,1900 enable=yes'

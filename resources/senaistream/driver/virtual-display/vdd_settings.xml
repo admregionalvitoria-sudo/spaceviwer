@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <vdd_settings>
     <monitors>
-        <count>1</count>
+        <count>4</count>
     </monitors>
     <gpu>
         <friendlyname>default</friendlyname>
@@ -17,19 +17,29 @@
 	</global>
     <resolutions>
         <resolution>
-            <width>800</width>
-            <height>600</height>
-            <refresh_rate>30</refresh_rate>
+            <width>1920</width>
+            <height>1080</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>2560</width>
+            <height>1440</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>3840</width>
+            <height>2160</height>
+            <refresh_rate>60</refresh_rate>
         </resolution>
         <resolution>
             <width>1366</width>
             <height>768</height>
-            <refresh_rate>30</refresh_rate>
+            <refresh_rate>60</refresh_rate>
         </resolution>
         <resolution>
-            <width>1920</width>
-            <height>1080</height>
-            <refresh_rate>30</refresh_rate>
+            <width>800</width>
+            <height>600</height>
+            <refresh_rate>60</refresh_rate>
         </resolution>
         <resolution>
             <width>2560</width>

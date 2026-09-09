@@ -28,8 +28,11 @@ function request(options, data = null) {
   });
 }
 
+const pkg = require('../package.json');
+const VERSION = pkg.version;
+
 async function main() {
-  console.log('Criando release v2.2.2 no GitHub...');
+  console.log(`Criando release v${VERSION} no GitHub...`);
   const releaseRes = await request({
     hostname: 'api.github.com',
     path: '/repos/admregionalvitoria-sudo/spaceviwer/releases',
@@ -41,10 +44,10 @@ async function main() {
       'Accept': 'application/vnd.github.v3+json'
     }
   }, {
-    tag_name: 'v2.2.2',
+    tag_name: `v${VERSION}`,
     target_commitish: 'main',
-    name: 'SpaceViewer v2.2.2 - Correção de Transmissão e Atualização In-Place',
-    body: `### Novidades da Versão 2.2.2\n\n- **Correção Fatal de Objeto Destruído**: Corrigida exceção 'TypeError: Object has been destroyed' ao fechar ou interromper projeções.\n- **Captura Resiliente de Janelas**: Adicionada restauração automática de janelas minimizadas no Windows DWM e fallback adaptável para o getUserMedia.\n- **Mover Janela Aperfeiçoado**: Suporte a movimentação precisa de janelas via HWND nativo.\n- **Atualização In-Place Sem Desinstalar**: O instalador agora encerra automaticamente processos em segundo plano para atualização direta.\n\nInstalador executável em anexo.`,
+    name: `SpaceViewer v${VERSION} - Múltiplas Telas no Moonlight e Correção de Firewall`,
+    body: `### Novidades da Versão ${VERSION}\n\n- **Identificação no Moonlight**: O prefixo foi ajustado para 'SpaceViewer - [Nome do Computador]'.\n- **Suporte a Múltiplas Telas Virtuais**: Expansão do driver para até 4 telas virtuais independentes para transmissão para múltiplos Moonlights/Smart TVs simultaneamente.\n- **Correção de Firewall (UDP 47999)**: Regras universais liberando portas UDP 47998-48010 e TCP 47984, 47989, 48010 eliminando o Erro 11.\n- **Detecção Aprimorada de Janelas**: Detecção de aplicativos abertos e minimizados na função 'Mover Janela' com botão de atualização.\n\nInstalador executável em anexo.`,
     draft: false,
     prerelease: false
   });
@@ -55,7 +58,7 @@ async function main() {
     console.log('Buscando release existente...');
     const latest = await request({
       hostname: 'api.github.com',
-      path: '/repos/admregionalvitoria-sudo/spaceviwer/releases/tags/v2.2.2',
+      path: `/repos/admregionalvitoria-sudo/spaceviwer/releases/tags/v${VERSION}`,
       method: 'GET',
       headers: {
         'User-Agent': 'SpaceViewer-App',
@@ -66,7 +69,7 @@ async function main() {
     uploadUrl = latest.body?.upload_url;
     if (latest.body?.assets && Array.isArray(latest.body.assets)) {
       for (const asset of latest.body.assets) {
-        if (asset.name === 'SpaceViewer-Setup-2.2.2.exe') {
+        if (asset.name === `SpaceViewer-Setup-${VERSION}.exe`) {
           console.log(`Excluindo asset anterior do GitHub (ID: ${asset.id})...`);
           await request({
             hostname: 'api.github.com',
@@ -85,14 +88,14 @@ async function main() {
   }
 
   if (uploadUrl) {
-    const finalUploadUrl = uploadUrl.replace('{?name,label}', '?name=SpaceViewer-Setup-2.2.2.exe');
+    const finalUploadUrl = uploadUrl.replace('{?name,label}', `?name=SpaceViewer-Setup-${VERSION}.exe`);
     const parsed = new URL(finalUploadUrl);
-    let exePath = path.resolve(__dirname, '../dist-build/SpaceViewer-Setup-2.2.2.exe');
+    let exePath = path.resolve(__dirname, `../dist-build/SpaceViewer-Setup-${VERSION}.exe`);
     if (!fs.existsSync(exePath)) {
-      exePath = path.resolve(__dirname, '../dist-installer/SpaceViewer-Setup-2.2.2.exe');
+      exePath = path.resolve(__dirname, `../dist-installer/SpaceViewer-Setup-${VERSION}.exe`);
     }
     if (!fs.existsSync(exePath)) {
-      exePath = path.resolve(__dirname, '../release/SpaceViewer-Setup-2.2.2.exe');
+      exePath = path.resolve(__dirname, `../release/SpaceViewer-Setup-${VERSION}.exe`);
     }
     if (!fs.existsSync(exePath)) {
       console.error('Arquivo executavel nao encontrado em:', exePath);

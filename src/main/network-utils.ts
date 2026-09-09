@@ -122,4 +122,36 @@ export function ensurePrivateNetworkProfile(): void {
       }
     }
   );
+
+  ensureGameStreamFirewallRules();
 }
+
+/**
+ * Ensures Windows Firewall allows inbound traffic for Moonlight GameStream (UDP 47999 / 47998-48010),
+ * mDNS discovery (UDP 5353) and WebRTC without executable path restrictions.
+ */
+export function ensureGameStreamFirewallRules(): void {
+  if (process.platform !== 'win32') return;
+
+  const script = `
+    $rules = @(
+      @{ Name = "SpaceViewer GameStream Ports UDP"; Protocol = "UDP"; Port = "47998-48010" },
+      @{ Name = "SpaceViewer GameStream Ports TCP"; Protocol = "TCP"; Port = "47984,47989,48010" },
+      @{ Name = "SpaceViewer Discovery UDP"; Protocol = "UDP"; Port = "5353,1900" },
+      @{ Name = "SpaceViewer WebRTC TCP"; Protocol = "TCP"; Port = "7523,7524" }
+    )
+    foreach ($r in $rules) {
+      $existing = Get-NetFirewallRule -DisplayName $r.Name -ErrorAction SilentlyContinue
+      if (-not $existing) {
+        New-NetFirewallRule -DisplayName $r.Name -Direction Inbound -Action Allow -Profile Any -Protocol $r.Protocol -LocalPort $r.Port -ErrorAction SilentlyContinue | Out-Null
+      }
+    }
+  `;
+  const b64 = Buffer.from(script, 'utf16le').toString('base64');
+  exec(`powershell -NoProfile -NonInteractive -EncodedCommand ${b64}`, (err) => {
+    if (!err) {
+      console.log('[SpaceViewer] GameStream and Moonlight firewall rules (including UDP 47999) verified.');
+    }
+  });
+}
+

@@ -120,6 +120,18 @@ export const ScreensPanel: React.FC = () => {
     }
   };
 
+  const handleRefreshAppWindows = async () => {
+    setLoadingApps(true);
+    try {
+      const windows = await window.screenflow.getAppWindows();
+      setAppWindows(windows || []);
+    } catch (err) {
+      console.error('[ScreensPanel] Error loading app windows:', err);
+    } finally {
+      setLoadingApps(false);
+    }
+  };
+
   // Project selected app onto target display
   const handleProjectApp = async (app: AppWindowSource) => {
     if (!targetScreenForApp) return;
@@ -585,8 +597,8 @@ export const ScreensPanel: React.FC = () => {
             </div>
 
             {/* Search Input */}
-            <div className="p-4 border-b border-neutral-200 bg-white">
-              <div className="relative">
+            <div className="p-4 border-b border-neutral-200 bg-white flex items-center gap-2">
+              <div className="relative flex-1">
                 <input
                   type="text"
                   value={searchFilter}
@@ -608,6 +620,18 @@ export const ScreensPanel: React.FC = () => {
                   />
                 </svg>
               </div>
+
+              <button
+                onClick={handleRefreshAppWindows}
+                disabled={loadingApps}
+                className="px-3 py-2.5 rounded-xl border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-700 font-mono text-xs font-bold uppercase transition flex items-center space-x-1.5 cursor-pointer shrink-0"
+                title="Atualizar lista de janelas abertas no Windows"
+              >
+                <svg className={`w-3.5 h-3.5 text-neutral-600 ${loadingApps ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Atualizar</span>
+              </button>
             </div>
 
             {/* App Windows Grid */}
@@ -618,9 +642,25 @@ export const ScreensPanel: React.FC = () => {
                   <span className="font-mono text-xs uppercase text-neutral-500">Listando janelas ativas...</span>
                 </div>
               ) : filteredApps.length === 0 ? (
-                <div className="py-16 text-center flex flex-col items-center justify-center space-y-2 text-neutral-500">
-                  <p className="font-sans text-sm font-medium">Nenhum aplicativo correspondente encontrado.</p>
-                  <span className="text-xs text-neutral-400">Abra o aplicativo desejado no Windows e atualize.</span>
+                <div className="py-12 text-center flex flex-col items-center justify-center space-y-3 text-neutral-600 max-w-md mx-auto">
+                  <div className="w-12 h-12 rounded-2xl bg-neutral-100 border border-neutral-250 flex items-center justify-center text-neutral-400">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <p className="font-sans text-sm font-semibold text-neutral-800">Nenhum aplicativo aberto encontrado.</p>
+                  <span className="text-xs text-neutral-500 leading-relaxed">
+                    Abra o aplicativo desejado (Chrome, Edge, WhatsApp, Excel, etc.) no Windows e clique no botão abaixo para atualizar. Janelas minimizadas na barra de tarefas também podem ser movidas.
+                  </span>
+                  <button
+                    onClick={handleRefreshAppWindows}
+                    className="mt-2 px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-[0.98] text-white font-mono text-xs font-bold uppercase transition flex items-center space-x-1.5 shadow-sm cursor-pointer"
+                  >
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Atualizar Janelas do Windows</span>
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

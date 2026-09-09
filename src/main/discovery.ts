@@ -46,22 +46,12 @@ export class NetworkDiscovery extends EventEmitter {
       }) as unknown as Service;
       console.log(`[ScreenFlow] mDNS: Published master "${name}" on port ${port}`);
 
-      // Publish Moonlight standard nvstream target on port 47989
+      // Publish Moonlight GameStream target with SpaceViewer prefix and PC hostname
       const cleanHost = getCleanMdnsHostname();
-      this.publishedMoonlightService = this.bonjour.publish({
-        name: cleanHost,
-        type: 'nvstream',
-        port: 47989,
-        txt: {
-          version: '7.1.431.0',
-          os: process.platform,
-        },
-      }) as unknown as Service;
-      console.log(`[ScreenFlow] mDNS: Published Moonlight target "${cleanHost}" on port 47989`);
+      const spaceViewerName = `SpaceViewer - ${cleanHost}`;
 
-      // Also publish SenaiStream-prefixed instance name for compatibility
-      this.publishedSenaiService = this.bonjour.publish({
-        name: `SenaiStream-${cleanHost}`,
+      this.publishedMoonlightService = this.bonjour.publish({
+        name: spaceViewerName,
         type: 'nvstream',
         port: 47989,
         txt: {
@@ -69,7 +59,19 @@ export class NetworkDiscovery extends EventEmitter {
           os: process.platform,
         },
       }) as unknown as Service;
-      console.log(`[ScreenFlow] mDNS: Published SenaiStream target "SenaiStream-${cleanHost}" on port 47989`);
+      console.log(`[ScreenFlow] mDNS: Published GameStream target "${spaceViewerName}" on port 47989`);
+
+      // Also publish secondary formats so Moonlight on any TV/OS finds the host effortlessly
+      this.publishedSenaiService = this.bonjour.publish({
+        name: `SpaceViewer-${cleanHost}`,
+        type: 'nvstream',
+        port: 47989,
+        txt: {
+          version: '7.1.431.0',
+          os: process.platform,
+        },
+      }) as unknown as Service;
+      console.log(`[ScreenFlow] mDNS: Published secondary GameStream target "SpaceViewer-${cleanHost}" on port 47989`);
     } catch (err) {
       console.error('[ScreenFlow] mDNS publish error:', err);
     }
