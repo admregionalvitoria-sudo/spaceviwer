@@ -365,20 +365,20 @@ export const ScreensPanel: React.FC = () => {
           </button>
         </GlassCard>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {screens.map((screen, idx) => {
             const isProjecting = Boolean(screen.projectedApp);
 
             return (
               <GlassCard
                 key={screen.displayId || screen.id}
-                className="p-5 flex flex-col justify-between space-y-4 overflow-hidden border border-neutral-200/90 hover:border-neutral-400 transition-all duration-300 shadow-md group relative"
+                className="p-4 flex flex-col justify-between space-y-3 overflow-hidden border border-neutral-200/90 hover:border-neutral-400 transition-all duration-300 shadow-sm hover:shadow-md group relative rounded-2xl"
               >
                 {/* Card Top Header */}
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center space-x-3 min-w-0">
+                  <div className="flex items-center space-x-2.5 min-w-0">
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border transition-all ${
                         screen.isPrimary
                           ? 'bg-amber-50 border-amber-200 text-amber-700'
                           : screen.isVirtual
@@ -386,56 +386,56 @@ export const ScreensPanel: React.FC = () => {
                           : 'bg-neutral-100 border-neutral-250 text-neutral-800'
                       }`}
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <rect x="2" y="3" width="20" height="14" rx="2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         <path d="M8 21h8m-4-4v4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </div>
 
                     <div className="min-w-0">
-                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                        <h3 className="font-display font-bold text-base text-neutral-900 truncate">
+                      <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                        <h3 className="font-display font-bold text-sm text-neutral-900 truncate">
                           {screen.name}
                         </h3>
 
                         {/* Badges */}
                         {screen.isPrimary && (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                          <span className="px-1.5 py-0.5 rounded-md text-[8px] font-mono font-bold uppercase bg-amber-100 text-amber-900 border border-amber-300">
                             Principal
                           </span>
                         )}
                         {screen.isVirtual && (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-indigo-100 text-indigo-900 border border-indigo-300">
-                            Virtual MTT VDD
+                          <span className="px-1.5 py-0.5 rounded-md text-[8px] font-mono font-bold uppercase bg-indigo-100 text-indigo-900 border border-indigo-300">
+                            Virtual MTT
                           </span>
                         )}
                         {screen.isMoonlightTarget && (
-                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-cyan-100 text-cyan-900 border border-cyan-300 animate-pulse">
+                          <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[8px] font-mono font-bold uppercase bg-cyan-100 text-cyan-900 border border-cyan-300 animate-pulse">
                             <span className="w-1.5 h-1.5 rounded-full bg-cyan-600" />
-                            <span>Transmitindo Moonlight</span>
+                            <span>Moonlight</span>
                           </span>
                         )}
                         {isProjecting && (
-                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-rose-100 text-rose-900 border border-rose-300 animate-pulse">
+                          <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[8px] font-mono font-bold uppercase bg-rose-100 text-rose-900 border border-rose-300 animate-pulse">
                             <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-                            <span>Transmissão Ativa</span>
+                            <span>Ativo</span>
                           </span>
                         )}
                       </div>
 
-                      <p className="text-[10px] font-mono text-neutral-500 mt-0.5">
-                        Resolução: {screen.size.width} × {screen.size.height} · Escala: {Math.round(screen.scaleFactor * 100)}% · Posição: ({screen.bounds.x}, {screen.bounds.y})
+                      <p className="text-[9px] font-mono text-neutral-500 mt-0.5 truncate">
+                        {screen.size.width}×{screen.size.height} · {Math.round(screen.scaleFactor * 100)}% · ({screen.bounds.x}, {screen.bounds.y})
                       </p>
                     </div>
                   </div>
 
-                  <span className="font-mono text-xs font-black text-neutral-400 bg-neutral-100 px-2 py-1 rounded-lg border border-neutral-200 shrink-0">
+                  <span className="font-mono text-[10px] font-black text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200 shrink-0">
                     #{idx + 1}
                   </span>
                 </div>
 
-                {/* Large 16:9 Live Preview Container */}
-                <div className="w-full aspect-video rounded-xl bg-neutral-950 border border-neutral-300/80 overflow-hidden relative shadow-inner flex items-center justify-center group-hover:border-neutral-400 transition-all">
+                {/* Compact Live Preview Container */}
+                <div className="w-full h-36 sm:h-40 rounded-xl bg-neutral-950 border border-neutral-300/80 overflow-hidden relative shadow-inner flex items-center justify-center group-hover:border-neutral-400 transition-all">
                   {screen.thumbnail ? (
                     <img
                       src={screen.thumbnail}
@@ -443,63 +443,75 @@ export const ScreensPanel: React.FC = () => {
                       className="w-full h-full object-contain select-none"
                     />
                   ) : (
-                    <div className="flex flex-col items-center justify-center text-neutral-500 space-y-2">
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex flex-col items-center justify-center text-neutral-500 space-y-1">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
-                      <span className="text-[10px] font-mono uppercase">Aguardando feed de vídeo</span>
+                      <span className="text-[9px] font-mono uppercase">Aguardando feed</span>
                     </div>
                   )}
 
                   {/* Live Status Overlay */}
-                  <div className="absolute top-3 left-3 z-10 flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white font-mono text-[10px] uppercase font-bold">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <div className="absolute top-2 left-2 z-10 flex items-center space-x-1 px-2 py-0.5 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white font-mono text-[9px] uppercase font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     <span>Ao Vivo</span>
                   </div>
 
                   {/* Projected App Banner on Video */}
                   {isProjecting && screen.projectedApp && (
-                    <div className="absolute bottom-3 inset-x-3 z-10 p-2.5 rounded-xl bg-neutral-900/90 backdrop-blur-md border border-neutral-700 text-white flex items-center justify-between">
-                      <div className="flex items-center space-x-2 min-w-0">
-                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
-                        <span className="text-xs font-bold truncate">
-                          App: {screen.projectedApp.appName}
+                    <div className="absolute bottom-2 inset-x-2 z-10 p-2 rounded-lg bg-neutral-900/90 backdrop-blur-md border border-neutral-700 text-white flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5 min-w-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                        <span className="text-[11px] font-bold truncate">
+                          {screen.projectedApp.appName}
                         </span>
                       </div>
                       <button
                         onClick={() => handleStopProjection(screen.displayId)}
-                        className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition cursor-pointer shrink-0"
+                        className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase rounded bg-rose-600 hover:bg-rose-700 text-white transition cursor-pointer shrink-0 ml-1"
                       >
-                        Interromper
+                        Parar
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Card Bottom Actions & App Transmit Section */}
-                <div className="pt-2 border-t border-neutral-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                  {/* Left: Quick Actions */}
-                  <div className="flex items-center space-x-2 flex-wrap gap-y-2">
-                    {/* Transmit App Button */}
+                {/* Card Bottom Actions — MOVER JANELA COMO FUNÇÃO PRINCIPAL */}
+                <div className="pt-2 border-t border-neutral-200/80 flex flex-col gap-2">
+                  {/* Top row: Primary Action Button (Mover Janela) + Secondary (Espelhar) */}
+                  <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleOpenAppSelector(screen)}
-                      className="px-3.5 py-2 text-xs font-bold font-mono uppercase rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-[0.98] text-white transition cursor-pointer flex items-center space-x-2 shadow-sm"
-                      title="Escolher qualquer aplicativo em execução no PC para transmitir nesta tela"
+                      className="flex-1 py-2 px-3 text-xs font-bold font-mono uppercase rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-[0.98] text-white transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-sm"
+                      title="Mover uma janela de aplicativo aberta diretamente para esta tela"
                     >
-                      <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
-                      <span>{isProjecting ? 'Trocar Aplicativo' : 'Transmitir Aplicativo'}</span>
+                      <span className="truncate">Mover Janela para cá</span>
                     </button>
 
-                    {/* Set as Moonlight screen button */}
+                    <button
+                      onClick={() => handleOpenAppSelector(screen)}
+                      className="py-2 px-2.5 text-xs font-mono font-bold uppercase rounded-xl border border-neutral-300 hover:border-neutral-400 bg-white hover:bg-neutral-50 text-neutral-700 transition cursor-pointer flex items-center space-x-1 shadow-xs shrink-0"
+                      title="Espelhar aplicativo em tela cheia via streaming"
+                    >
+                      <svg className="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      <span>{isProjecting ? 'Trocar' : 'Espelhar'}</span>
+                    </button>
+                  </div>
+
+                  {/* Bottom row: Moonlight and Stop Projector */}
+                  <div className="flex items-center justify-between gap-2">
                     {!screen.isMoonlightTarget ? (
                       <button
                         onClick={() => handleSetMoonlightScreen(screen)}
-                        className="px-3 py-2 text-xs font-mono font-bold uppercase rounded-xl border border-neutral-300 hover:border-neutral-400 bg-white hover:bg-neutral-50 text-neutral-800 transition cursor-pointer flex items-center space-x-1.5 shadow-xs"
+                        className="flex-1 py-1.5 px-2.5 text-[10px] font-mono font-bold uppercase rounded-lg border border-neutral-250 hover:border-neutral-400 bg-white hover:bg-neutral-50 text-neutral-700 transition cursor-pointer flex items-center justify-center space-x-1 shadow-2xs"
                         title="Transmitir o conteúdo desta tela no Moonlight para Smart TVs"
                       >
-                        <svg className="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -510,8 +522,8 @@ export const ScreensPanel: React.FC = () => {
                         <span>Definir no Moonlight</span>
                       </button>
                     ) : (
-                      <span className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase rounded-xl bg-cyan-50 border border-cyan-300 text-cyan-800 flex items-center space-x-1.5">
-                        <svg className="w-3.5 h-3.5 text-cyan-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <span className="flex-1 py-1 px-2 text-[9px] font-mono font-bold uppercase rounded-lg bg-cyan-50 border border-cyan-300 text-cyan-800 flex items-center justify-center space-x-1">
+                        <svg className="w-3 h-3 text-cyan-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -519,23 +531,22 @@ export const ScreensPanel: React.FC = () => {
                             d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
                           />
                         </svg>
-                        <span>Tela Ativa no Moonlight</span>
+                        <span>Ativo no Moonlight</span>
                       </span>
                     )}
-                  </div>
 
-                  {/* Right: Stop Projector button if active */}
-                  {isProjecting && (
-                    <button
-                      onClick={() => handleStopProjection(screen.displayId)}
-                      className="px-3 py-1.5 text-xs font-mono font-bold uppercase rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-200 transition cursor-pointer flex items-center space-x-1 self-end sm:self-center"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      <span>Parar Transmissão</span>
-                    </button>
-                  )}
+                    {isProjecting && (
+                      <button
+                        onClick={() => handleStopProjection(screen.displayId)}
+                        className="py-1 px-2.5 text-[10px] font-mono font-bold uppercase rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-200 transition cursor-pointer flex items-center space-x-1 shrink-0"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <span>Parar</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </GlassCard>
             );
@@ -548,18 +559,18 @@ export const ScreensPanel: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl border border-neutral-300 shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="p-6 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/70">
+            <div className="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/70">
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
-                  <span className="px-2.5 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-200 font-mono text-[10px] font-black uppercase">
-                    Transmissão de Aplicativos
+                  <span className="px-2.5 py-0.5 rounded-md bg-neutral-900 text-white font-mono text-[10px] font-black uppercase">
+                    Mover Aplicativos & Janelas
                   </span>
                 </div>
                 <h3 className="font-display font-black text-xl text-neutral-900 uppercase">
-                  Transmitir para: {targetScreenForApp.name}
+                  Mover para: {targetScreenForApp.name}
                 </h3>
                 <p className="text-xs text-neutral-500">
-                  Escolha qualquer aplicativo aberto no seu computador. Ele será projetado em tela cheia na tela selecionada (inclusive no Moonlight para a Smart TV).
+                  Clique em <strong>Mover Janela</strong> para transferir a janela aberta diretamente para esta tela, ou em <strong>Espelhar</strong> para transmitir a visualização.
                 </p>
               </div>
 
@@ -600,7 +611,7 @@ export const ScreensPanel: React.FC = () => {
             </div>
 
             {/* App Windows Grid */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-5">
               {loadingApps ? (
                 <div className="py-16 flex flex-col items-center justify-center space-y-3">
                   <div className="w-8 h-8 border-3 border-neutral-300 border-t-neutral-900 rounded-full animate-spin" />
@@ -612,14 +623,14 @@ export const ScreensPanel: React.FC = () => {
                   <span className="text-xs text-neutral-400">Abra o aplicativo desejado no Windows e atualize.</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {filteredApps.map((app) => (
                     <div
                       key={app.id}
-                      className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 hover:border-neutral-400 transition flex flex-col justify-between space-y-3 shadow-xs hover:shadow-md group"
+                      className="p-3 rounded-2xl bg-neutral-50 border border-neutral-200 hover:border-neutral-400 transition flex flex-col justify-between space-y-2.5 shadow-xs hover:shadow-md group"
                     >
                       {/* App Window Thumbnail */}
-                      <div className="w-full aspect-video rounded-xl bg-neutral-900 overflow-hidden relative border border-neutral-250">
+                      <div className="w-full h-28 sm:h-32 rounded-xl bg-neutral-900 overflow-hidden relative border border-neutral-250 flex items-center justify-center">
                         {app.thumbnail ? (
                           <img src={app.thumbnail} alt={app.name} className="w-full h-full object-contain" />
                         ) : (
@@ -630,12 +641,12 @@ export const ScreensPanel: React.FC = () => {
                       </div>
 
                       {/* App Info */}
-                      <div className="flex items-center space-x-2.5 min-w-0">
+                      <div className="flex items-center space-x-2 min-w-0">
                         {app.appIcon ? (
-                          <img src={app.appIcon} alt="" className="w-6 h-6 object-contain shrink-0" />
+                          <img src={app.appIcon} alt="" className="w-5 h-5 object-contain shrink-0" />
                         ) : (
-                          <div className="w-6 h-6 rounded bg-neutral-200 flex items-center justify-center text-neutral-600 shrink-0">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="w-5 h-5 rounded bg-neutral-200 flex items-center justify-center text-neutral-600 shrink-0">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth="2" />
                               <path d="M3 9h18M9 21V9" strokeWidth="2" />
                             </svg>
@@ -646,25 +657,31 @@ export const ScreensPanel: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* Transmission Buttons */}
+                      {/* Action Buttons — MOVER JANELA como AÇÃO PRINCIPAL */}
                       <div className="flex items-center space-x-2 pt-1">
+                        {/* Primary Button: Mover Janela */}
+                        <button
+                          onClick={() => handleMoveWindow(app)}
+                          className="flex-1 py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-[0.98] text-white font-mono text-[11px] font-bold uppercase transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-sm"
+                          title="Mover a janela do aplicativo diretamente para esta tela"
+                        >
+                          <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          <span className="truncate">Mover Janela</span>
+                        </button>
+
+                        {/* Secondary Button: Espelhar */}
                         <button
                           onClick={() => handleProjectApp(app)}
                           disabled={projectingScreenId !== null}
-                          className="flex-1 py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-[0.98] text-white font-mono text-[10px] font-bold uppercase transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-sm"
+                          className="py-2 px-2.5 rounded-xl border border-neutral-300 hover:border-neutral-400 bg-white hover:bg-neutral-100 text-neutral-700 font-mono text-[10px] font-bold uppercase transition cursor-pointer flex items-center space-x-1 shadow-xs shrink-0"
+                          title="Espelhar aplicativo em tela cheia via streaming"
                         >
-                          <svg className="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                          <svg className="w-3 h-3 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                           </svg>
-                          <span>Transmitir em Tela Cheia</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleMoveWindow(app)}
-                          className="py-2 px-3 rounded-xl border border-neutral-300 hover:bg-neutral-100 text-neutral-800 font-mono text-[10px] font-bold uppercase transition cursor-pointer"
-                          title="Mover a janela nativa do programa para a tela"
-                        >
-                          Mover Janela
+                          <span>Espelhar</span>
                         </button>
                       </div>
                     </div>
@@ -688,6 +705,7 @@ export const ScreensPanel: React.FC = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

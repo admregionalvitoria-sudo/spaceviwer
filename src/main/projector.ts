@@ -33,22 +33,41 @@ function notifyChange() {
 }
 
 /**
+ * Safely executes a PowerShell script on Windows using Base64 UTF-16LE -EncodedCommand.
+ * This completely avoids quoting issues, line-break destruction, and here-string syntax errors.
+ */
+function runPowerShellScript(script: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const encoded = Buffer.from(script, 'utf16le').toString('base64');
+      exec(`powershell -NoProfile -NonInteractive -EncodedCommand ${encoded}`, (err, stdout, stderr) => {
+        if (err) {
+          return reject(new Error(stderr?.trim() || stdout?.trim() || err.message));
+        }
+        resolve(stdout?.trim() || '');
+      });
+    } catch (e: any) {
+      reject(e);
+    }
+  });
+}
+
+/**
  * Ensures an application window is restored if it was minimized to the taskbar.
  * Minimized windows in Windows DWM stop rendering their visual buffers, causing
  * Chromium's DesktopCapturer to fail with "Could not start video source".
  */
-export function restoreWindowIfMinimized(sourceId: string, appName: string): Promise<void> {
-  return new Promise((resolve) => {
-    if (!sourceId.startsWith('window:')) {
-      return resolve();
-    }
+export async function restoreWindowIfMinimized(sourceId: string, appName: string): Promise<void> {
+  if (!sourceId.startsWith('window:')) {
+    return;
+  }
 
-    try {
-      const parts = sourceId.split(':');
-      const hwndVal = parseInt(parts[1], 10);
-      const escapedTitle = appName.replace(/'/g, "''").replace(/[\[\]]/g, '').slice(0, 20);
+  try {
+    const parts = sourceId.split(':');
+    const hwndVal = parseInt(parts[1], 10);
+    const escapedTitle = appName.replace(/'/g, "''").replace(/[\[\]]/g, '').slice(0, 20);
 
-      const psScript = `
+    const psScript = `
 Add-Type @"
   using System;
   using System.Runtime.InteropServices;
@@ -79,14 +98,12 @@ if (-not $done -and "${escapedTitle}") {
 }
 `;
 
-      exec(`powershell -NoProfile -NonInteractive -Command "${psScript.replace(/\r?\n/g, ' ')}"`, () => {
-        // Allow brief delay for Windows DWM compositor to restore frame buffer
-        setTimeout(resolve, 200);
-      });
-    } catch {
-      resolve();
-    }
-  });
+    await runPowerShellScript(psScript);
+    // Allow brief delay for Windows DWM compositor to restore frame buffer
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  } catch (err) {
+    console.warn('[Projector] Failed to restore window if minimized:', err);
+  }
 }
 
 /**
@@ -260,11 +277,11 @@ export async function moveWindowToScreen(
   displayId: string,
   sourceId?: string
 ): Promise<{ success: boolean; error?: string }> {
-  return new Promise((resolve) => {
+  try {
     const displays = screen.getAllDisplays();
     const targetDisplay = displays.find((d) => d.id.toString() === displayId) || displays[0];
     if (!targetDisplay) {
-      return resolve({ success: false, error: 'Display not found' });
+      return { success: false, error: 'Tela de destino não encontrada' };
     }
 
     const { x, y, width, height } = targetDisplay.bounds;
@@ -276,7 +293,8 @@ export async function moveWindowToScreen(
       }
     }
 
-    const escapedTitle = windowName.replace(/'/g, "''").replace(/[\[\]]/g, '');
+    const escapedTitle = windowName.replace(/'/g, "''").replace(/[\[\]]/g, '').slice(0, 25);
+
     const psScript = `
 Add-Type @"
   using System;
@@ -286,40 +304,54 @@ Add-Type @"
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern bool IsWindow(IntPtr hWnd);
   }
 "@
-$moved = $false
+
+$targetHwnd = [IntPtr]::Zero
+
 ${hwndVal > 0 ? `
 try {
-  $h = [IntPtr]${hwndVal}
-  [Win32Mover]::ShowWindow($h, 9)
-  [Win32Mover]::SetWindowPos($h, [IntPtr]::Zero, ${x}, ${y}, ${width}, ${height}, 0x0040)
-  $moved = $true
-  Write-Output "OK"
+  $test = [IntPtr]${hwndVal}
+  if ([Win32Mover]::IsWindow($test)) {
+    $targetHwnd = $test
+  }
 } catch {}
 ` : ''}
-if (-not $moved) {
-  $proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*${escapedTitle.slice(0, 20)}*" -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+
+if ($targetHwnd -eq [IntPtr]::Zero -and "${escapedTitle}") {
+  $proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*${escapedTitle}*" -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
   if ($proc) {
-    [Win32Mover]::ShowWindow($proc.MainWindowHandle, 9)
-    [Win32Mover]::SetWindowPos($proc.MainWindowHandle, [IntPtr]::Zero, ${x}, ${y}, ${width}, ${height}, 0x0040)
-    Write-Output "OK"
-  } else {
-    Write-Output "NOT_FOUND"
+    $targetHwnd = $proc.MainWindowHandle
   }
+}
+
+if ($targetHwnd -ne [IntPtr]::Zero) {
+  # SW_RESTORE (9) in case window is minimized
+  [Win32Mover]::ShowWindow($targetHwnd, 9)
+  # Move and resize to target screen coordinates (SWP_SHOWWINDOW = 0x0040)
+  [Win32Mover]::SetWindowPos($targetHwnd, [IntPtr]::Zero, ${x}, ${y}, ${width}, ${height}, 0x0040)
+  # SW_MAXIMIZE (3) so the app cleanly occupies the target display
+  [Win32Mover]::ShowWindow($targetHwnd, 3)
+  [Win32Mover]::SetForegroundWindow($targetHwnd)
+  Write-Output "OK"
+} else {
+  Write-Output "NOT_FOUND"
 }
 `;
 
-    exec(`powershell -NoProfile -NonInteractive -Command "${psScript.replace(/\r?\n/g, ' ')}"`, (err, stdout) => {
-      if (err) {
-        console.warn('[Projector] Move window error:', err);
-        return resolve({ success: false, error: err.message });
-      }
-      if (stdout.includes('OK')) {
-        resolve({ success: true });
-      } else {
-        resolve({ success: false, error: 'Janela do aplicativo não encontrada para movimentação' });
-      }
-    });
-  });
+    const result = await runPowerShellScript(psScript);
+    if (result.includes('OK')) {
+      console.log(`[Projector] Window "${windowName}" moved successfully to screen ${displayId}`);
+      return { success: true };
+    } else {
+      return { success: false, error: 'Janela do aplicativo não encontrada para movimentação' };
+    }
+  } catch (err: any) {
+    console.error('[Projector] Move window error:', err);
+    return { success: false, error: err?.message || 'Falha ao mover a janela' };
+  }
 }
