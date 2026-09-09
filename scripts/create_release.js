@@ -64,6 +64,24 @@ async function main() {
       }
     });
     uploadUrl = latest.body?.upload_url;
+    if (latest.body?.assets && Array.isArray(latest.body.assets)) {
+      for (const asset of latest.body.assets) {
+        if (asset.name === 'SpaceViewer-Setup-2.2.2.exe') {
+          console.log(`Excluindo asset anterior do GitHub (ID: ${asset.id})...`);
+          await request({
+            hostname: 'api.github.com',
+            path: `/repos/admregionalvitoria-sudo/spaceviwer/releases/assets/${asset.id}`,
+            method: 'DELETE',
+            headers: {
+              'User-Agent': 'SpaceViewer-App',
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          });
+          console.log('Asset antigo removido com sucesso.');
+        }
+      }
+    }
   }
 
   if (uploadUrl) {
@@ -84,28 +102,38 @@ async function main() {
     const stat = fs.statSync(exePath);
     console.log(`Fazendo upload do executável (${(stat.size / (1024 * 1024)).toFixed(1)} MB)...`);
 
-    const fileStream = fs.createReadStream(exePath);
-    const uploadReq = https.request({
-      hostname: parsed.hostname,
-      path: parsed.pathname + parsed.search,
-      method: 'POST',
-      headers: {
-        'User-Agent': 'SpaceViewer-App',
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/vnd.microsoft.portable-executable',
-        'Content-Length': stat.size
-      }
-    }, (res) => {
-      let body = '';
-      res.on('data', chunk => body += chunk);
-      res.on('end', () => {
-        console.log('Upload concluído com status:', res.statusCode);
+    await new Promise((resolve, reject) => {
+      const fileStream = fs.createReadStream(exePath);
+      const uploadReq = https.request({
+        hostname: parsed.hostname,
+        path: parsed.pathname + parsed.search,
+        method: 'POST',
+        headers: {
+          'User-Agent': 'SpaceViewer-App',
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/vnd.microsoft.portable-executable',
+          'Content-Length': stat.size
+        }
+      }, (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+          console.log('Upload concluído com status:', res.statusCode);
+          resolve();
+        });
       });
-    });
 
-    uploadReq.on('error', (e) => console.error('Erro no upload:', e));
-    fileStream.pipe(uploadReq);
+      uploadReq.on('error', (e) => {
+        console.error('Erro no upload:', e);
+        reject(e);
+      });
+      fileStream.pipe(uploadReq);
+    });
   }
+  console.log('Release sincronizada com sucesso no GitHub!');
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
