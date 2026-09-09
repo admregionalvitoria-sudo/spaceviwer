@@ -234,7 +234,7 @@ export interface SmartTVDevice {
   status: 'online' | 'streaming' | 'paired';
   isMoonlightPaired: boolean;
   clientUuid?: string;
-  type: 'tv' | 'streaming_box' | 'moonlight_app';
+  type: 'tv' | 'streaming_box' | 'moonlight_app' | 'console';
   lastSeen: number;
 }
 
@@ -282,7 +282,7 @@ export interface ScreenFlowAPI {
   stopObsProjector: (displayId?: string) => Promise<{ success: boolean }>;
   getProjectorParams: () => Promise<{ sourceId: string; appName: string; displayId?: string } | null>;
   getActiveProjectors: () => Promise<ProjectorState>;
-  moveWindowToScreen: (windowName: string, displayId: string) => Promise<{ success: boolean; error?: string }>;
+  moveWindowToScreen: (windowName: string, displayId: string, sourceId?: string) => Promise<{ success: boolean; error?: string }>;
 
   // Master
   getScreens: () => Promise<ScreenSource[]>;

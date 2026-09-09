@@ -33,6 +33,63 @@ function notifyChange() {
 }
 
 /**
+ * Ensures an application window is restored if it was minimized to the taskbar.
+ * Minimized windows in Windows DWM stop rendering their visual buffers, causing
+ * Chromium's DesktopCapturer to fail with "Could not start video source".
+ */
+export function restoreWindowIfMinimized(sourceId: string, appName: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (!sourceId.startsWith('window:')) {
+      return resolve();
+    }
+
+    try {
+      const parts = sourceId.split(':');
+      const hwndVal = parseInt(parts[1], 10);
+      const escapedTitle = appName.replace(/'/g, "''").replace(/[\[\]]/g, '').slice(0, 20);
+
+      const psScript = `
+Add-Type @"
+  using System;
+  using System.Runtime.InteropServices;
+  public class Win32Restorer {
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")]
+    public static extern bool IsIconic(IntPtr hWnd);
+  }
+"@
+$done = $false
+${!isNaN(hwndVal) && hwndVal > 0 ? `
+try {
+  $h = [IntPtr]${hwndVal}
+  if ([Win32Restorer]::IsIconic($h)) {
+    [Win32Restorer]::ShowWindow($h, 9)
+    $done = $true
+  }
+} catch {}
+` : ''}
+if (-not $done -and "${escapedTitle}") {
+  try {
+    $proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*${escapedTitle}*" -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+    if ($proc -and [Win32Restorer]::IsIconic($proc.MainWindowHandle)) {
+      [Win32Restorer]::ShowWindow($proc.MainWindowHandle, 9)
+    }
+  } catch {}
+}
+`;
+
+      exec(`powershell -NoProfile -NonInteractive -Command "${psScript.replace(/\r?\n/g, ' ')}"`, () => {
+        // Allow brief delay for Windows DWM compositor to restore frame buffer
+        setTimeout(resolve, 200);
+      });
+    } catch {
+      resolve();
+    }
+  });
+}
+
+/**
  * Starts a fullscreen projector of an application onto a target display.
  */
 export async function startAppProjector(
@@ -50,11 +107,18 @@ export async function startAppProjector(
       return { success: false, error: `Display ${displayId} not found` };
     }
 
-    // If a projector already exists on this display, close it first
+    // If it's an application window, restore it if minimized so DWM renders it
+    if (sourceId.startsWith('window:')) {
+      await restoreWindowIfMinimized(sourceId, appName);
+    }
+
+    // If a projector already exists on this display, close it safely first
     const existing = activeProjectors.get(displayId);
     if (existing) {
       try {
-        existing.win.destroy();
+        if (!existing.win.isDestroyed()) {
+          existing.win.destroy();
+        }
       } catch {}
       activeProjectors.delete(displayId);
     }
@@ -78,6 +142,8 @@ export async function startAppProjector(
       },
     });
 
+    const webContentsId = win.webContents.id;
+
     const queryParams = new URLSearchParams({
       projector: 'true',
       sourceId,
@@ -86,7 +152,7 @@ export async function startAppProjector(
     });
 
     // Store in params map so the window can also fetch its params directly via IPC
-    windowProjectorParams.set(win.webContents.id, {
+    windowProjectorParams.set(webContentsId, {
       sourceId,
       appName,
       displayId,
@@ -118,7 +184,9 @@ export async function startAppProjector(
     });
 
     win.on('closed', () => {
-      windowProjectorParams.delete(win.webContents.id);
+      try {
+        windowProjectorParams.delete(webContentsId);
+      } catch {}
       activeProjectors.delete(displayId);
       notifyChange();
     });
@@ -142,13 +210,19 @@ export async function stopAppProjector(displayId?: string): Promise<{ success: b
     if (displayId) {
       const entry = activeProjectors.get(displayId);
       if (entry) {
-        entry.win.destroy();
+        try {
+          if (!entry.win.isDestroyed()) {
+            entry.win.destroy();
+          }
+        } catch {}
         activeProjectors.delete(displayId);
       }
     } else {
       activeProjectors.forEach((entry) => {
         try {
-          entry.win.destroy();
+          if (!entry.win.isDestroyed()) {
+            entry.win.destroy();
+          }
         } catch {}
       });
       activeProjectors.clear();
@@ -183,7 +257,8 @@ export function getActiveProjectors(): ProjectorState {
  */
 export async function moveWindowToScreen(
   windowName: string,
-  displayId: string
+  displayId: string,
+  sourceId?: string
 ): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
     const displays = screen.getAllDisplays();
@@ -193,26 +268,45 @@ export async function moveWindowToScreen(
     }
 
     const { x, y, width, height } = targetDisplay.bounds;
-    // PowerShell script to locate window by title snippet and move/maximize it
+    let hwndVal = 0;
+    if (sourceId && sourceId.startsWith('window:')) {
+      const parsed = parseInt(sourceId.split(':')[1], 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        hwndVal = parsed;
+      }
+    }
+
     const escapedTitle = windowName.replace(/'/g, "''").replace(/[\[\]]/g, '');
     const psScript = `
 Add-Type @"
   using System;
   using System.Runtime.InteropServices;
-  public class Win32 {
+  public class Win32Mover {
     [DllImport("user32.dll")]
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
   }
 "@
-$proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*${escapedTitle.slice(0, 20)}*" -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
-if ($proc) {
-  [Win32]::ShowWindow($proc.MainWindowHandle, 9)
-  [Win32]::SetWindowPos($proc.MainWindowHandle, [IntPtr]::Zero, ${x}, ${y}, ${width}, ${height}, 0x0040)
+$moved = $false
+${hwndVal > 0 ? `
+try {
+  $h = [IntPtr]${hwndVal}
+  [Win32Mover]::ShowWindow($h, 9)
+  [Win32Mover]::SetWindowPos($h, [IntPtr]::Zero, ${x}, ${y}, ${width}, ${height}, 0x0040)
+  $moved = $true
   Write-Output "OK"
-} else {
-  Write-Output "NOT_FOUND"
+} catch {}
+` : ''}
+if (-not $moved) {
+  $proc = Get-Process | Where-Object { $_.MainWindowTitle -like "*${escapedTitle.slice(0, 20)}*" -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+  if ($proc) {
+    [Win32Mover]::ShowWindow($proc.MainWindowHandle, 9)
+    [Win32Mover]::SetWindowPos($proc.MainWindowHandle, [IntPtr]::Zero, ${x}, ${y}, ${width}, ${height}, 0x0040)
+    Write-Output "OK"
+  } else {
+    Write-Output "NOT_FOUND"
+  }
 }
 `;
 

@@ -385,8 +385,8 @@ function registerIpcHandlers() {
     return getActiveProjectors();
   });
 
-  ipcMain.handle('move-window-to-screen', async (_, windowName: string, displayId: string) => {
-    return await moveWindowToScreen(windowName, displayId);
+  ipcMain.handle('move-window-to-screen', async (_, windowName: string, displayId: string, sourceId?: string) => {
+    return await moveWindowToScreen(windowName, displayId, sourceId);
   });
 
   // Master

@@ -17,8 +17,8 @@ const api: ScreenFlowAPI = {
   stopObsProjector: (displayId) => ipcRenderer.invoke('stop-app-projector', displayId),
   getProjectorParams: () => ipcRenderer.invoke('get-projector-params'),
   getActiveProjectors: () => ipcRenderer.invoke('get-active-projectors'),
-  moveWindowToScreen: (windowName, displayId) =>
-    ipcRenderer.invoke('move-window-to-screen', windowName, displayId),
+  moveWindowToScreen: (windowName, displayId, sourceId) =>
+    ipcRenderer.invoke('move-window-to-screen', windowName, displayId, sourceId),
 
   // === MASTER ===
   getScreens: () => ipcRenderer.invoke('get-screens'),
@@ -75,6 +75,7 @@ const api: ScreenFlowAPI = {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximizeWindow: () => ipcRenderer.send('window-maximize'),
+  closeWindow: () => ipcRenderer.send('window-close'),
   // === AUTO-UPDATE ===
   checkForUpdates: () => ipcRenderer.invoke('updater:check'),
   downloadAndInstallUpdate: (downloadUrl: string) => ipcRenderer.invoke('updater:download-and-install', downloadUrl),

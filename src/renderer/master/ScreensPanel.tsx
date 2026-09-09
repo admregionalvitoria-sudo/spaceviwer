@@ -148,7 +148,7 @@ export const ScreensPanel: React.FC = () => {
   const handleMoveWindow = async (app: AppWindowSource) => {
     if (!targetScreenForApp) return;
     try {
-      const res = await window.screenflow.moveWindowToScreen(app.name, targetScreenForApp.displayId);
+      const res = await window.screenflow.moveWindowToScreen(app.name, targetScreenForApp.displayId, app.id);
       if (res.success) {
         setActionMessage(`Janela movida para ${targetScreenForApp.name}`);
         setTargetScreenForApp(null);

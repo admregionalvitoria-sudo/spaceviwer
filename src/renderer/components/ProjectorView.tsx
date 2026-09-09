@@ -33,24 +33,57 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({ sourceId, appName,
     }
   };
 
+  const [retryTrigger, setRetryTrigger] = useState(0);
+
   useEffect(() => {
     let isMounted = true;
 
     async function initCapture() {
       try {
         console.log('[ProjectorView] Capturing source for projection:', sourceId);
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            mandatory: {
-              chromeMediaSource: 'desktop',
-              chromeMediaSourceId: sourceId,
-              maxWidth: 3840,
-              maxHeight: 2160,
-              maxFrameRate: 60,
-            },
-          } as any,
-        });
+        let stream: MediaStream | null = null;
+        let lastError: any = null;
+
+        // Attempt 1: Standard constraints (Full HD / 60fps)
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: sourceId,
+                maxWidth: 1920,
+                maxHeight: 1080,
+                maxFrameRate: 60,
+              },
+            } as any,
+          });
+        } catch (err1) {
+          console.warn('[ProjectorView] Attempt 1 with 1080p constraints failed, attempting fallback without resolution limits:', err1);
+          lastError = err1;
+        }
+
+        // Attempt 2: Minimal fallback (no resolution/fps limits, just raw source capture)
+        if (!stream) {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: {
+                mandatory: {
+                  chromeMediaSource: 'desktop',
+                  chromeMediaSourceId: sourceId,
+                },
+              } as any,
+            });
+          } catch (err2) {
+            console.warn('[ProjectorView] Attempt 2 without constraints failed:', err2);
+            lastError = err2;
+          }
+        }
+
+        if (!stream) {
+          throw lastError || new Error('Could not start video source');
+        }
 
         if (!isMounted) {
           stream.getTracks().forEach((t) => t.stop());
@@ -61,10 +94,16 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({ sourceId, appName,
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+        setError(null);
       } catch (err: any) {
         console.error('[ProjectorView] Failed to capture window stream:', err);
         if (isMounted) {
-          setError(err?.message || 'Falha ao capturar a janela do aplicativo.');
+          const isSourceErr = err?.message?.includes('Could not start video source');
+          setError(
+            isSourceErr
+              ? 'Não foi possível iniciar a captura deste aplicativo. Se a janela estiver minimizada, restaure-a no Windows. Você também pode usar a opção "Mover Janela" no painel principal.'
+              : err?.message || 'Falha ao capturar a janela do aplicativo.'
+          );
         }
       }
     }
@@ -90,7 +129,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({ sourceId, appName,
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
-  }, [sourceId, displayId]);
+  }, [sourceId, displayId, retryTrigger]);
 
   return (
     <div className="w-screen h-screen bg-black overflow-hidden select-none relative flex items-center justify-center cursor-default">
@@ -113,12 +152,23 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({ sourceId, appName,
           </div>
           <h2 className="text-white font-bold text-lg">Erro na Transmissão</h2>
           <p className="text-neutral-400 text-sm max-w-md">{error}</p>
-          <button
-            onClick={handleClose}
-            className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-mono text-xs uppercase"
-          >
-            Fechar Transmissão (ESC)
-          </button>
+          <div className="flex items-center space-x-3 pt-2">
+            <button
+              onClick={() => {
+                setError(null);
+                setRetryTrigger((prev) => prev + 1);
+              }}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-mono text-xs uppercase font-bold transition cursor-pointer"
+            >
+              Tentar Novamente
+            </button>
+            <button
+              onClick={handleClose}
+              className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-mono text-xs uppercase cursor-pointer"
+            >
+              Fechar Transmissão (ESC)
+            </button>
+          </div>
         </div>
       )}
 
