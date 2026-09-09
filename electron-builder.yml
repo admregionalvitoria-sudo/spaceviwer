@@ -8,7 +8,7 @@ publish:
   repo: spaceviwer
 
 directories:
-  output: release
+  output: dist-build
 
 extraResources:
   - from: resources/senaistream

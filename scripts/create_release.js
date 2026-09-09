@@ -69,7 +69,13 @@ async function main() {
   if (uploadUrl) {
     const finalUploadUrl = uploadUrl.replace('{?name,label}', '?name=SpaceViewer-Setup-2.2.2.exe');
     const parsed = new URL(finalUploadUrl);
-    const exePath = path.resolve(__dirname, '../release/SpaceViewer-Setup-2.2.2.exe');
+    let exePath = path.resolve(__dirname, '../dist-build/SpaceViewer-Setup-2.2.2.exe');
+    if (!fs.existsSync(exePath)) {
+      exePath = path.resolve(__dirname, '../dist-installer/SpaceViewer-Setup-2.2.2.exe');
+    }
+    if (!fs.existsSync(exePath)) {
+      exePath = path.resolve(__dirname, '../release/SpaceViewer-Setup-2.2.2.exe');
+    }
     if (!fs.existsSync(exePath)) {
       console.error('Arquivo executavel nao encontrado em:', exePath);
       return;

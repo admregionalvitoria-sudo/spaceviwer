@@ -40,6 +40,10 @@ echo.
 echo [3/3] Sincronizando instalador entre as pastas de saida...
 if not exist "dist-installer" mkdir "dist-installer" >nul 2>&1
 if not exist "dist-electron" mkdir "dist-electron" >nul 2>&1
+if exist "dist-build\SpaceViewer-Setup-*.exe" (
+    copy /Y "dist-build\SpaceViewer-Setup-*.exe" "dist-installer\" >nul
+    copy /Y "dist-build\SpaceViewer-Setup-*.exe" "dist-electron\" >nul
+)
 if exist "release\SpaceViewer-Setup-*.exe" (
     copy /Y "release\SpaceViewer-Setup-*.exe" "dist-installer\" >nul
     copy /Y "release\SpaceViewer-Setup-*.exe" "dist-electron\" >nul
