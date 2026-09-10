@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(SpaceViewerStream VERSION 2.2.13 LANGUAGES C CXX)
+project(SpaceViewerStream VERSION 2.2.14 LANGUAGES C CXX)
 
 if(NOT WIN32)
   message(FATAL_ERROR "SenaiStream currently targets Windows only")

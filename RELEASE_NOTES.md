@@ -1,10 +1,9 @@
-## SpaceViewer 2.2.13
+## SpaceViewer 2.2.14
 
-- Corrige áudio silencioso quando o Moonlight envia o primeiro ping UDP antes de concluir o ANNOUNCE: o servidor aguarda os parâmetros finais de criptografia e duração antes de transmitir.
-- Ajusta os timestamps de áudio para os milissegundos esperados pelo GameStream.
-- Usa Opus com tamanho constante, compatível com os blocos de áudio do receptor Moonlight.
-- Preserva a atribuição independente de telas e aplicativos por TV da versão 2.2.12.
+- Corrige o erro HTTP 403 na busca de atualizações causado pelo limite de consultas da API pública do GitHub.
+- Consulta o manifesto público latest.yml, sem token e sem depender da API REST.
+- Valida versão e nome do instalador, limita redirecionamentos e mantém erros de conexão visíveis.
 
-Validação: 33 testes nativos, incluindo dois clientes com ping anterior ao ANNOUNCE, recepção UDP, descriptografia com chaves distintas, decodificação Opus e captura isolada de dois aplicativos; 11 testes de integração e verificação TypeScript.
+Validação: quatro testes do atualizador e consulta/download reais com a API REST retornando 403. Preserva as correções de áudio e telas anteriores.
 
-Após atualizar, reconecte o Moonlight e selecione o aplicativo em Áudio exclusivo desta TV. A reprodução nas TVs físicas ainda precisa ser confirmada pelo usuário.
+Quem estiver com o atualizador bloqueado na versão anterior pode instalar esta versão pelo download direto da release. As próximas consultas usam o novo mecanismo.

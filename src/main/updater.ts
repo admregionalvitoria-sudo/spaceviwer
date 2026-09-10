@@ -50,56 +50,64 @@ function compareVersions(v1: string, v2: string): number {
   return 0;
 }
 
-function fetchJson(url: string): Promise<any> {
+/** Reads the public release manifest without using GitHub's rate-limited REST API. */
+function fetchManifest(url: string, redirects = 0): Promise<string> {
   return new Promise((resolve, reject) => {
-    const options = {
-      headers: {
-        'User-Agent': 'SpaceViewer-App',
-        'Accept': 'application/vnd.github.v3+json',
-      },
-    };
-
-    const req = https.get(url, options, (res) => {
-      // Handle redirects
+    if (redirects > 5 || new URL(url).protocol !== 'https:') {
+      reject(new Error('Redirecionamento inválido no servidor de atualizações')); return;
+    }
+    const req = https.get(url, { headers: { 'User-Agent': 'SpaceViewer-App', Accept: 'text/plain' } }, res => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchJson(res.headers.location).then(resolve).catch(reject);
+        res.resume();
+        fetchManifest(new URL(res.headers.location, url).href, redirects + 1).then(resolve, reject); return;
       }
-
-      if (res.statusCode === 404) {
-        return resolve({ notFound: true });
+      if (res.statusCode !== 200) {
+        res.resume(); reject(new Error('Servidor de atualizações retornou código ' + res.statusCode)); return;
       }
-
-      if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
-        return reject(new Error(`Servidor de atualizações retornou código ${res.statusCode}`));
-      }
-
       let data = '';
-      res.on('data', (chunk) => (data += chunk));
-      res.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch (e) {
-          reject(new Error('Falha ao processar resposta do servidor de atualizações'));
-        }
+      res.setEncoding('utf8');
+      res.on('data', chunk => {
+        data += chunk;
+        if (data.length > 65536) req.destroy(new Error('Manifesto de atualização muito grande'));
       });
+      res.on('error', reject);
+      res.on('aborted', () => reject(new Error('Conexão de atualização interrompida')));
+      res.on('end', () => resolve(data));
     });
-
     req.on('error', reject);
-    req.setTimeout(15000, () => {
-      req.destroy();
-      reject(new Error('Tempo limite de conexão esgotado'));
-    });
+    req.setTimeout(15000, () => req.destroy(new Error('Tempo limite de conexão esgotado')));
   });
+}
+
+/** Parses only the scalar fields written by electron-builder; rejects unexpected installer paths. */
+function publicRelease(manifest: string) {
+  const field = (name: string) => {
+    const value = manifest.match(new RegExp('^' + name + ': *(.+)$', 'm'))?.[1]?.trim() || '';
+    return value.replace(/^['"]|['"]$/g, '');
+  };
+  const version = field('version');
+  const asset = field('path');
+  if (!/^\d+\.\d+\.\d+$/.test(version) || asset !== 'SpaceViewer-Setup-' + version + '.exe') {
+    throw new Error('Manifesto de atualização inválido');
+  }
+  const base = 'https://github.com/' + GITHUB_REPO_OWNER + '/' + GITHUB_REPO_NAME + '/releases';
+  return {
+    tag_name: 'v' + version, name: 'SpaceViewer ' + version,
+    body: 'Consulte as novidades na página desta versão.', published_at: field('releaseDate'),
+    html_url: base + '/tag/v' + version,
+    assets: [{ name: asset, browser_download_url: base + '/download/v' + version + '/' + asset,
+      size: Number(manifest.match(/^ +size: *(\d+)/m)?.[1]) || undefined }],
+  };
 }
 
 export async function checkForAppUpdates(): Promise<UpdateInfo> {
   const currentVersion = APP_VERSION || app.getVersion();
 
   try {
-    const url = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/latest`;
-    const release = await fetchJson(url);
+    const url = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/latest/download/latest.yml`;
+    const release = publicRelease(await fetchManifest(url));
 
-    if (release.notFound || !release.tag_name) {
+    if (!release.tag_name) {
       return {
         updateAvailable: false,
         currentVersion,
