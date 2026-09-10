@@ -2,6 +2,7 @@ import React from 'react';
 import clsx from 'clsx';
 import logoUrl from '../../assets/logo.png';
 import type { SidebarTab } from './Sidebar';
+import { APP_VERSION } from '../../../shared/constants';
 
 export { SidebarTab };
 
@@ -236,7 +237,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           ) : (
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-mono text-neutral-400 font-bold tracking-wider">SPACEVIEWER</span>
-              <span className="text-[9px] font-mono text-neutral-500">v2.2.0</span>
+              <span className="text-[9px] font-mono text-neutral-500">v{APP_VERSION}</span>
             </div>
           )}
         </div>

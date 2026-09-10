@@ -46,8 +46,8 @@ async function main() {
   }, {
     tag_name: `v${VERSION}`,
     target_commitish: 'main',
-    name: `SpaceViewer v${VERSION} - Atualização com Elevação UAC e Reinício Automático`,
-    body: `### Novidades da Versão ${VERSION}\n\n- **Atualizador Automático Aprimorado**: Correção de elevação UAC no Windows permitindo que versões anteriores atualizem sem fechar silenciosamente.\n- **Interface Limpa e Profissional**: Remoção de referências externas na aba de Ajustes para uma experiência nativa e integrada.\n- **Notificação e Reinício Transparente**: Exibição da barra de instalação e solicitação intuitiva para reiniciar o aplicativo.\n- **Suporte a Múltiplas Telas Virtuais**: Expansão do driver para até 4 telas virtuais independentes para transmissão para múltiplos Moonlights/Smart TVs simultaneamente.\n- **Regras de Firewall Otimizadas**: Conectividade direta de portas de streaming sem bloqueios.\n\nInstalador executável em anexo.`,
+    name: `SpaceViewer v${VERSION} - Descoberta no Moonlight como spacedesk, Instalação do Driver no Setup e Correções`,
+    body: `### Novidades da Versão ${VERSION}\n\n- **Identificação no Moonlight como 'spacedesk'**: O host do computador agora é anunciado e exibido no Moonlight como 'spacedesk - [Nome do Computador]'.\n- **Instalação Automática Completa do Driver Virtual**: O instalador registra o driver diretamente no DriverStore do Windows (via pnputil /add-driver /install) e ativa o modo estendido com 4 telas virtuais automaticamente.\n- **Descoberta Automática de Rede Local no Moonlight**: Anúncio mDNS Bonjour otimizado e liberação universal no Firewall de todas as portas (TCP e UDP 47984-48010, 5353, 1900) para localização imediata na TV sem precisar digitar o IP.\n- **Correção da Versão no Rodapé**: Exibição da versão real e dinâmica em todas as telas e no rodapé do aplicativo.\n\nInstalador executável em anexo.`,
     draft: false,
     prerelease: false
   });

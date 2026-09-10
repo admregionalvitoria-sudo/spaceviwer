@@ -121,7 +121,7 @@ export class GameStreamServer extends EventEmitter {
   <paired>1</paired>
   <state>sunshine_state</state>
   <mac>${mac}</mac>
-  <hostname>SpaceViewer - ${hostname}</hostname>
+  <hostname>spacedesk - ${hostname}</hostname>
   <uniqueid>${GAMESTREAM_UNIQUE_ID}</uniqueid>
   <ServerIP>${ip}</ServerIP>
   <ExternalIP>${ip}</ExternalIP>

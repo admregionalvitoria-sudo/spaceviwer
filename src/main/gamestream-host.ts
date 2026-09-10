@@ -155,6 +155,43 @@ export async function checkHostStatus(): Promise<SunshineStatus> {
   });
 }
 
+function ensureSunshineConfig(exePath: string): string {
+  const hostname = os.hostname();
+  const sunshineName = `spacedesk - ${hostname}`;
+  const confContent = [
+    `sunshine_name = ${sunshineName}`,
+    'min_log_level = info',
+    'origin_web_ui_allowed = lan',
+    'port = 47989',
+    '',
+  ].join('\n');
+
+  const primaryConfDir = path.join(path.dirname(exePath), 'config');
+  const primaryConfPath = path.join(primaryConfDir, 'sunshine.conf');
+
+  const confDirs = [
+    primaryConfDir,
+    path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'SenaiStream', 'config'),
+    path.join(os.homedir(), '.config', 'sunshine'),
+    path.join(process.env.PROGRAMDATA || 'C:\\ProgramData', 'Sunshine'),
+  ];
+
+  for (const dir of confDirs) {
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const targetPath = path.join(dir, 'sunshine.conf');
+      fs.writeFileSync(targetPath, confContent, 'utf-8');
+      console.log(`[GameStreamHost] Synced sunshine.conf (spacedesk - ${hostname}) to: ${targetPath}`);
+    } catch (err) {
+      console.warn(`[GameStreamHost] Warning writing sunshine.conf to ${dir}:`, err);
+    }
+  }
+
+  return primaryConfPath;
+}
+
 export async function startHost(): Promise<boolean> {
   const exePath = getSenaiStreamExePath();
   console.log(`[GameStreamHost] Starting native host at: ${exePath}`);
@@ -176,8 +213,11 @@ export async function startHost(): Promise<boolean> {
     // 2. Short pause for ports to be released
     await new Promise<void>((resolve) => setTimeout(resolve, 800));
 
-    // 3. Spawn SenaiStream with --host flag
-    hostProcess = spawn(exePath, ['--host'], {
+    // Ensure sunshine config sets host name to spacedesk - [hostname]
+    const confPath = ensureSunshineConfig(exePath);
+
+    // 3. Spawn SenaiStream with config file and --host flag
+    hostProcess = spawn(exePath, [confPath, '--host'], {
       cwd: path.dirname(exePath),
       detached: false,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -219,6 +259,17 @@ export async function startHost(): Promise<boolean> {
           virtualDisplay: _currentDisplayMode === 'extended',
           display: 0,
         });
+
+        // Ensure virtual display driver is active; trigger auto-installer if missing
+        getVirtualDisplayStatus().then((st) => {
+          if (!st.installed) {
+            console.log('[GameStreamHost] Virtual display driver not active, auto-installing...');
+            installVirtualDisplayDriver().catch((e) => {
+              console.warn('[GameStreamHost] Auto-install driver error:', e);
+            });
+          }
+        });
+
         return true;
       }
     }
@@ -267,21 +318,22 @@ export function ensureVirtualDisplaySettingsSync(): void {
       fs.mkdirSync(vddDir, { recursive: true });
     }
     const infPath = getVirtualDisplayInfPath();
-    const bundledSettings = path.join(path.dirname(infPath), 'vdd_settings.xml');
-    const targetSettings = path.join(vddDir, 'vdd_settings.xml');
+    const driverDir = path.dirname(infPath);
 
-    let needCopy = true;
-    if (fs.existsSync(targetSettings)) {
-      const current = fs.readFileSync(targetSettings, 'utf-8');
-      if (current.includes('<count>4</count>')) {
-        needCopy = false;
+    // Sync all virtual driver files to C:\VirtualDisplayDriver
+    const filesToSync = ['vdd_settings.xml', 'MttVDD.inf', 'MttVDD.dll', 'mttvdd.cat'];
+    for (const f of filesToSync) {
+      const src = path.join(driverDir, f);
+      const dst = path.join(vddDir, f);
+      if (fs.existsSync(src)) {
+        if (!fs.existsSync(dst) || f === 'vdd_settings.xml') {
+          try {
+            fs.copyFileSync(src, dst);
+          } catch {}
+        }
       }
     }
-
-    if (needCopy && fs.existsSync(bundledSettings)) {
-      fs.copyFileSync(bundledSettings, targetSettings);
-      console.log('[VirtualDisplay] Synced vdd_settings.xml (4 screens) to C:\\VirtualDisplayDriver');
-    }
+    console.log('[VirtualDisplay] Driver files and 4-screen configuration synced to C:\\VirtualDisplayDriver');
   } catch (err) {
     console.warn('[VirtualDisplay] Warning syncing settings:', err);
   }
@@ -334,7 +386,7 @@ export async function installVirtualDisplayDriver(): Promise<{
     } else {
       const escapedCtl = ctlPath.replace(/'/g, "''");
       const escapedInf = infPath.replace(/'/g, "''");
-      psScript = `Start-Process -FilePath '${escapedCtl}' -ArgumentList 'ensure', '\`"${escapedInf}\`"' -Verb RunAs -Wait -PassThru; pnputil /restart-device 'ROOT\\SENAISTREAM_VIRTUAL_DISPLAY\\0000'; pnputil /restart-device 'ROOT\\MTTVDD\\0000'; Start-Process -FilePath '${escapedCtl}' -ArgumentList 'extend' -Wait; DisplaySwitch.exe /extend`;
+      psScript = `pnputil /add-driver '${escapedInf}' /install; Start-Process -FilePath '${escapedCtl}' -ArgumentList 'ensure', '\`"${escapedInf}\`"' -Verb RunAs -Wait -PassThru; pnputil /restart-device 'ROOT\\SENAISTREAM_VIRTUAL_DISPLAY\\0000'; pnputil /restart-device 'ROOT\\MTTVDD\\0000'; Start-Process -FilePath '${escapedCtl}' -ArgumentList 'extend' -Wait; DisplaySwitch.exe /extend`;
     }
 
     exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript}"`, (err) => {

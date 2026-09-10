@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { InstallMode } from '../shared/types';
+import { APP_VERSION } from '../shared/constants';
 import MasterApp from './master/MasterApp';
 import AgentApp from './agent/AgentApp';
 import { TitleBar } from './components/ui/TitleBar';
@@ -187,7 +188,7 @@ export const App: React.FC = () => {
         </div>
 
         <div className="mt-12 text-[10px] text-neutral-500 font-mono">
-          SPACEVIEWER SYSTEM V2.2.0
+          SPACEVIEWER SYSTEM V{APP_VERSION}
         </div>
       </div>
     </div>

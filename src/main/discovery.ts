@@ -11,14 +11,16 @@ import {
   patchBonjourService,
   getCleanMdnsHostname,
   getLocalIPv4Addresses,
+  getPrimaryLANIPv4,
   ensurePrivateNetworkProfile,
 } from './network-utils';
 
 export class NetworkDiscovery extends EventEmitter {
-  private bonjourInstances: Bonjour[] = [];
+  private bonjour: Bonjour | null = null;
   private publishedServices: Service[] = [];
-  private browsers: ReturnType<Bonjour['find']>[] = [];
-  private agentBrowsers: ReturnType<Bonjour['find']>[] = [];
+  private browser: ReturnType<Bonjour['find']> | null = null;
+  private agentBrowser: ReturnType<Bonjour['find']> | null = null;
+  private reannounceTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     super();
@@ -29,23 +31,15 @@ export class NetworkDiscovery extends EventEmitter {
 
   private initBonjour(): void {
     this.destroy();
-    const ips = getLocalIPv4Addresses();
+    const primaryIp = getPrimaryLANIPv4();
 
-    // Bind Bonjour directly to each physical LAN/Wi-Fi IPv4 address
-    for (const ip of ips) {
-      try {
-        const b = new Bonjour({ interface: ip } as any);
-        this.bonjourInstances.push(b);
-        console.log(`[ScreenFlow] mDNS: Initialized Bonjour on physical LAN interface: ${ip}`);
-      } catch (err) {
-        console.warn(`[ScreenFlow] Failed to bind Bonjour to interface ${ip}:`, err);
-      }
-    }
-
-    // Also include a fallback 0.0.0.0 instance
     try {
-      this.bonjourInstances.push(new Bonjour());
-    } catch {}
+      this.bonjour = new Bonjour({ interface: primaryIp, reuseAddr: true } as any);
+      console.log(`[SpaceViewer] mDNS: Initialized Bonjour on physical LAN interface: ${primaryIp}`);
+    } catch (err) {
+      console.warn(`[SpaceViewer] Failed to bind Bonjour to interface ${primaryIp}, falling back to default:`, err);
+      this.bonjour = new Bonjour({ reuseAddr: true } as any);
+    }
   }
 
   /**
@@ -53,61 +47,104 @@ export class NetworkDiscovery extends EventEmitter {
    */
   publishMaster(name: string, port: number) {
     try {
+      if (!this.bonjour) {
+        this.initBonjour();
+      }
+      const b = this.bonjour!;
       const cleanHost = getCleanMdnsHostname();
-      const spaceViewerName = `SpaceViewer - ${cleanHost}`;
       const hostFqdn = `${cleanHost}.local`;
 
-      for (const b of this.bonjourInstances) {
-        try {
-          // 1. ScreenFlow Master discovery service
-          const s1 = b.publish({
-            name: `SpaceViewer-${name}`,
-            type: MDNS_SERVICE_TYPE,
-            port,
-            host: hostFqdn,
-            txt: {
-              version: APP_VERSION,
-              os: process.platform,
-              capabilities: 'video,audio',
-            },
-          }) as unknown as Service;
-          this.publishedServices.push(s1);
+      // moonlight names: spacedesk - [hostname] as requested by user, plus fallback aliases
+      const primarySpacedeskName = `spacedesk - ${cleanHost}`;
+      const secondarySpacedeskName = `spacedesk-${cleanHost}`;
+      const spaceViewerName = `SpaceViewer - ${cleanHost}`;
 
-          // 2. Moonlight GameStream primary service (_nvstream._tcp on port 47989)
-          const s2 = b.publish({
-            name: spaceViewerName,
-            type: 'nvstream',
-            port: 47989,
-            host: hostFqdn,
-            txt: {
-              version: '7.1.431.0',
-              appversion: '7.1.431.0',
-              os: process.platform,
-            },
-          }) as unknown as Service;
-          this.publishedServices.push(s2);
+      const nvTxt = {
+        version: '7.1.431.0',
+        appversion: '7.1.431.0',
+        os: process.platform,
+      };
 
-          // 3. Moonlight GameStream secondary format (_nvstream._tcp with dash)
-          const s3 = b.publish({
-            name: `SpaceViewer-${cleanHost}`,
-            type: 'nvstream',
-            port: 47989,
-            host: hostFqdn,
-            txt: {
-              version: '7.1.431.0',
-              appversion: '7.1.431.0',
-              os: process.platform,
-            },
-          }) as unknown as Service;
-          this.publishedServices.push(s3);
-        } catch (subErr) {
-          console.warn('[ScreenFlow] Error publishing master on instance:', subErr);
-        }
+      // 1. SpaceViewer Master discovery service
+      const s1 = b.publish({
+        name: `SpaceViewer-${name}`,
+        type: MDNS_SERVICE_TYPE,
+        port,
+        host: hostFqdn,
+        txt: {
+          version: APP_VERSION,
+          os: process.platform,
+          capabilities: 'video,audio',
+        },
+      }) as unknown as Service;
+      this.publishedServices.push(s1);
+
+      // 2. Moonlight GameStream primary service: spacedesk - [hostname] (_nvstream._tcp on port 47989)
+      const s2 = b.publish({
+        name: primarySpacedeskName,
+        type: 'nvstream',
+        port: 47989,
+        host: hostFqdn,
+        txt: nvTxt,
+      }) as unknown as Service;
+      this.publishedServices.push(s2);
+
+      // 3. Moonlight GameStream secondary format: spacedesk-[hostname]
+      const s3 = b.publish({
+        name: secondarySpacedeskName,
+        type: 'nvstream',
+        port: 47989,
+        host: hostFqdn,
+        txt: nvTxt,
+      }) as unknown as Service;
+      this.publishedServices.push(s3);
+
+      // 4. Moonlight GameStream debug channel (_nvstream_dbg._tcp on port 47989)
+      const s4 = b.publish({
+        name: primarySpacedeskName,
+        type: 'nvstream_dbg',
+        port: 47989,
+        host: hostFqdn,
+        txt: nvTxt,
+      }) as unknown as Service;
+      this.publishedServices.push(s4);
+
+      // 5. SpaceViewer fallback aliases
+      const s5 = b.publish({
+        name: spaceViewerName,
+        type: 'nvstream',
+        port: 47989,
+        host: hostFqdn,
+        txt: nvTxt,
+      }) as unknown as Service;
+      this.publishedServices.push(s5);
+
+      const s6 = b.publish({
+        name: cleanHost,
+        type: 'nvstream',
+        port: 47989,
+        host: hostFqdn,
+        txt: nvTxt,
+      }) as unknown as Service;
+      this.publishedServices.push(s6);
+
+      console.log(`[SpaceViewer] mDNS: Published GameStream Moonlight targets "${primarySpacedeskName}", "${spaceViewerName}", "${cleanHost}" on port 47989`);
+
+      // Periodic re-announcement every 10 seconds so Moonlight on the TV discovers the host promptly
+      if (this.reannounceTimer) {
+        clearInterval(this.reannounceTimer);
       }
-
-      console.log(`[ScreenFlow] mDNS: Published GameStream target "${spaceViewerName}" across ${this.bonjourInstances.length} network interfaces`);
+      this.reannounceTimer = setInterval(() => {
+        try {
+          for (const s of this.publishedServices) {
+            if (s && typeof (s as any).publish === 'function') {
+              (s as any).publish();
+            }
+          }
+        } catch {}
+      }, 10000);
     } catch (err) {
-      console.error('[ScreenFlow] mDNS publish error:', err);
+      console.error('[SpaceViewer] mDNS publish error:', err);
     }
   }
 
@@ -116,45 +153,42 @@ export class NetworkDiscovery extends EventEmitter {
    */
   discoverMasters(callback: (master: MasterInfo) => void): void {
     try {
-      for (const b of this.bonjourInstances) {
-        try {
-          const browser = b.find({ type: MDNS_SERVICE_TYPE });
-
-          browser.on('up', (service: Service) => {
-            const master: MasterInfo = {
-              name: service.name,
-              host: service.host,
-              addresses: (service.addresses || []) as string[],
-              port: service.port,
-              version: service.txt?.version as string,
-              os: service.txt?.os as string,
-              capabilities: ((service.txt?.capabilities as string) || '').split(','),
-            };
-            console.log(`[ScreenFlow] mDNS: Discovered master "${master.name}" at ${master.host}:${master.port}`);
-            callback(master);
-            this.emit('master-found', master);
-          });
-
-          browser.on('down', (service: Service) => {
-            const master: MasterInfo = {
-              name: service.name,
-              host: service.host,
-              addresses: (service.addresses || []) as string[],
-              port: service.port,
-              offline: true,
-            };
-            console.log(`[ScreenFlow] mDNS: Master went offline "${master.name}"`);
-            callback(master);
-            this.emit('master-lost', master);
-          });
-
-          this.browsers.push(browser);
-        } catch {}
+      if (!this.bonjour) {
+        this.initBonjour();
       }
+      this.browser = this.bonjour!.find({ type: MDNS_SERVICE_TYPE });
 
-      console.log('[ScreenFlow] mDNS: Scanning for masters across interfaces...');
+      this.browser.on('up', (service: Service) => {
+        const master: MasterInfo = {
+          name: service.name,
+          host: service.host,
+          addresses: (service.addresses || []) as string[],
+          port: service.port,
+          version: service.txt?.version as string,
+          os: service.txt?.os as string,
+          capabilities: ((service.txt?.capabilities as string) || '').split(','),
+        };
+        console.log(`[SpaceViewer] mDNS: Discovered master "${master.name}" at ${master.host}:${master.port}`);
+        callback(master);
+        this.emit('master-found', master);
+      });
+
+      this.browser.on('down', (service: Service) => {
+        const master: MasterInfo = {
+          name: service.name,
+          host: service.host,
+          addresses: (service.addresses || []) as string[],
+          port: service.port,
+          offline: true,
+        };
+        console.log(`[SpaceViewer] mDNS: Master went offline "${master.name}"`);
+        callback(master);
+        this.emit('master-lost', master);
+      });
+
+      console.log('[SpaceViewer] mDNS: Scanning for masters...');
     } catch (err) {
-      console.error('[ScreenFlow] mDNS discover error:', err);
+      console.error('[SpaceViewer] mDNS discover error:', err);
     }
   }
 
@@ -163,27 +197,26 @@ export class NetworkDiscovery extends EventEmitter {
    */
   publishAgent(name: string, port: number) {
     try {
+      if (!this.bonjour) {
+        this.initBonjour();
+      }
       const cleanHost = getCleanMdnsHostname();
       const hostFqdn = `${cleanHost}.local`;
 
-      for (const b of this.bonjourInstances) {
-        try {
-          const s = b.publish({
-            name: `SpaceViewerAgent-${name}`,
-            type: MDNS_AGENT_TYPE,
-            port,
-            host: hostFqdn,
-            txt: {
-              version: APP_VERSION,
-              os: process.platform,
-            },
-          }) as unknown as Service;
-          this.publishedServices.push(s);
-        } catch {}
-      }
-      console.log(`[ScreenFlow] mDNS: Published agent "${name}" on port ${port}`);
+      const s = this.bonjour!.publish({
+        name: `SpaceViewerAgent-${name}`,
+        type: MDNS_AGENT_TYPE,
+        port,
+        host: hostFqdn,
+        txt: {
+          version: APP_VERSION,
+          os: process.platform,
+        },
+      }) as unknown as Service;
+      this.publishedServices.push(s);
+      console.log(`[SpaceViewer] mDNS: Published agent "${name}" on port ${port}`);
     } catch (err) {
-      console.error('[ScreenFlow] mDNS agent publish error:', err);
+      console.error('[SpaceViewer] mDNS agent publish error:', err);
     }
   }
 
@@ -192,42 +225,39 @@ export class NetworkDiscovery extends EventEmitter {
    */
   discoverAgents(callback: (agent: any) => void): void {
     try {
-      for (const b of this.bonjourInstances) {
-        try {
-          const agentBrowser = b.find({ type: MDNS_AGENT_TYPE });
-
-          agentBrowser.on('up', (service: Service) => {
-            const agent = {
-              name: service.name.replace('SpaceViewerAgent-', ''),
-              host: service.host,
-              addresses: (service.addresses || []) as string[],
-              port: service.port,
-              os: (service.txt?.os as string) || 'unknown',
-              version: (service.txt?.version as string) || '1.0.0',
-            };
-            console.log(`[ScreenFlow] mDNS: Discovered agent "${agent.name}" at ${agent.host}:${agent.port}`);
-            callback(agent);
-          });
-
-          agentBrowser.on('down', (service: Service) => {
-            const agent = {
-              name: service.name.replace('SpaceViewerAgent-', ''),
-              host: service.host,
-              addresses: (service.addresses || []) as string[],
-              port: service.port,
-              offline: true,
-            };
-            console.log(`[ScreenFlow] mDNS: Agent went offline "${agent.name}"`);
-            callback(agent);
-          });
-
-          this.agentBrowsers.push(agentBrowser);
-        } catch {}
+      if (!this.bonjour) {
+        this.initBonjour();
       }
+      this.agentBrowser = this.bonjour!.find({ type: MDNS_AGENT_TYPE });
 
-      console.log('[ScreenFlow] mDNS: Scanning for agents across interfaces...');
+      this.agentBrowser.on('up', (service: Service) => {
+        const agent = {
+          name: service.name.replace('SpaceViewerAgent-', ''),
+          host: service.host,
+          addresses: (service.addresses || []) as string[],
+          port: service.port,
+          os: (service.txt?.os as string) || 'unknown',
+          version: (service.txt?.version as string) || '1.0.0',
+        };
+        console.log(`[SpaceViewer] mDNS: Discovered agent "${agent.name}" at ${agent.host}:${agent.port}`);
+        callback(agent);
+      });
+
+      this.agentBrowser.on('down', (service: Service) => {
+        const agent = {
+          name: service.name.replace('SpaceViewerAgent-', ''),
+          host: service.host,
+          addresses: (service.addresses || []) as string[],
+          port: service.port,
+          offline: true,
+        };
+        console.log(`[SpaceViewer] mDNS: Agent went offline "${agent.name}"`);
+        callback(agent);
+      });
+
+      console.log('[SpaceViewer] mDNS: Scanning for agents...');
     } catch (err) {
-      console.error('[ScreenFlow] mDNS agent discover error:', err);
+      console.error('[SpaceViewer] mDNS agent discover error:', err);
     }
   }
 
@@ -235,32 +265,29 @@ export class NetworkDiscovery extends EventEmitter {
    * Stop all mDNS activity.
    */
   destroy() {
-    for (const b of this.bonjourInstances) {
+    if (this.reannounceTimer) {
+      clearInterval(this.reannounceTimer);
+      this.reannounceTimer = null;
+    }
+    if (this.bonjour) {
       try {
-        b.unpublishAll();
+        this.bonjour.unpublishAll();
+        this.bonjour.destroy();
       } catch {}
+      this.bonjour = null;
     }
     this.publishedServices = [];
-
-    for (const br of this.browsers) {
+    if (this.browser) {
       try {
-        br.stop();
+        this.browser.stop();
       } catch {}
+      this.browser = null;
     }
-    this.browsers = [];
-
-    for (const abr of this.agentBrowsers) {
+    if (this.agentBrowser) {
       try {
-        abr.stop();
+        this.agentBrowser.stop();
       } catch {}
+      this.agentBrowser = null;
     }
-    this.agentBrowsers = [];
-
-    for (const b of this.bonjourInstances) {
-      try {
-        b.destroy();
-      } catch {}
-    }
-    this.bonjourInstances = [];
   }
 }

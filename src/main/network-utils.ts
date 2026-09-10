@@ -155,8 +155,8 @@ export function ensureGameStreamFirewallRules(): void {
 
   const script = `
     $rules = @(
-      @{ Name = "SpaceViewer GameStream Ports UDP"; Protocol = "UDP"; Port = "47998-48010" },
-      @{ Name = "SpaceViewer GameStream Ports TCP"; Protocol = "TCP"; Port = "47984,47989,48010" },
+      @{ Name = "SpaceViewer GameStream Ports UDP"; Protocol = "UDP"; Port = "47984-48010" },
+      @{ Name = "SpaceViewer GameStream Ports TCP"; Protocol = "TCP"; Port = "47984-48010" },
       @{ Name = "SpaceViewer Discovery UDP"; Protocol = "UDP"; Port = "5353,1900" },
       @{ Name = "SpaceViewer WebRTC TCP"; Protocol = "TCP"; Port = "7523,7524" }
     )
