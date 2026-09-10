@@ -166,7 +166,7 @@ export interface CaptureConfig {
 }
 
 // ============================================================
-// Moonlight / GameStream (SenaiStream) Integration Types
+// Moonlight / GameStream (SpaceviwerStream) Integration Types
 // ============================================================
 
 export type DisplayTopologyMode = 'extended' | 'duplicate';
@@ -194,6 +194,15 @@ export interface HostSettings {
 export interface VirtualDisplayStatus {
   installed: boolean;
   active: boolean;
+  enabled?: boolean;
+  count?: number;
+}
+
+export interface VirtualDisplayState {
+  installed: boolean;
+  active: boolean;
+  enabled: boolean;
+  count: number;
 }
 
 /** A Moonlight client that has been paired with this host */
@@ -303,7 +312,7 @@ export interface ScreenFlowAPI {
   connectToMaster: (info: MasterInfo) => Promise<boolean>;
   disconnectFromMaster: () => Promise<void>;
 
-  // Moonlight / GameStream (Native SenaiStream Host)
+  // Moonlight / GameStream (Native SpaceviwerStream Host)
   checkSunshine: () => Promise<SunshineStatus>;
   startGameStream: () => Promise<boolean>;
   stopGameStream: () => Promise<void>;
@@ -312,6 +321,11 @@ export interface ScreenFlowAPI {
 
   // Extended Virtual Display & Native Host Controls
   getVirtualDisplayStatus: () => Promise<VirtualDisplayStatus>;
+  getVirtualDisplayState: () => Promise<VirtualDisplayState>;
+  setVirtualDisplayCount: (count: number) => Promise<{ success: boolean; count?: number; error?: string }>;
+  addVirtualDisplay: () => Promise<{ success: boolean; count: number; error?: string }>;
+  removeVirtualDisplay: () => Promise<{ success: boolean; count: number; error?: string }>;
+  toggleVirtualDisplays: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   installVirtualDisplayDriver: () => Promise<{ success: boolean; error?: string; rebootRequired?: boolean }>;
   setDisplayMode: (mode: DisplayTopologyMode) => Promise<{ success: boolean; error?: string }>;
   getHostDisplays: () => Promise<HostDisplayInfo[]>;

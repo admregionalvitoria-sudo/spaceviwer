@@ -27,27 +27,30 @@ if exist "C:\VirtualDisplayDriver\MttVDD.inf" (
     pnputil /add-driver "C:\VirtualDisplayDriver\MttVDD.inf" /install >nul 2>&1
 )
 
-:: 3. Criar / Registrar dispositivo PnP via SenaiStreamDisplayCtl ensure
-if exist "..\SenaiStreamDisplayCtl.exe" (
+:: 3. Criar / Registrar dispositivo PnP via SpaceviwerStreamDisplayCtl ensure
+set CTL_EXE=""
+if exist "..\SpaceviwerStreamDisplayCtl.exe" set CTL_EXE="..\SpaceviwerStreamDisplayCtl.exe"
+
+if %CTL_EXE% neq "" (
     echo [SpaceViewer] Registrando adaptador de video virtual no Windows PnP...
     if exist "virtual-display\MttVDD.inf" (
-        "..\SenaiStreamDisplayCtl.exe" ensure "virtual-display\MttVDD.inf" >nul 2>&1
+        %CTL_EXE% ensure "virtual-display\MttVDD.inf" >nul 2>&1
     ) else if exist "C:\VirtualDisplayDriver\MttVDD.inf" (
-        "..\SenaiStreamDisplayCtl.exe" ensure "C:\VirtualDisplayDriver\MttVDD.inf" >nul 2>&1
+        %CTL_EXE% ensure "C:\VirtualDisplayDriver\MttVDD.inf" >nul 2>&1
     )
 )
 
-:: 4. Reiniciar dispositivo PnP para carregar as 4 telas virtuais imediatamente
-echo [SpaceViewer] Reiniciando adaptador de video virtual para ativar os 4 monitores...
-pnputil /restart-device "ROOT\SENAISTREAM_VIRTUAL_DISPLAY\0000" >nul 2>&1
+:: 4. Reiniciar dispositivo PnP para carregar as telas virtuais imediatamente
+echo [SpaceViewer] Reiniciando adaptador de video virtual para ativar os monitores...
+pnputil /restart-device "ROOT\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\0000" >nul 2>&1
 pnputil /restart-device "ROOT\MTTVDD\0000" >nul 2>&1
 pnputil /restart-device "SWD\MTT_VDD\0000" >nul 2>&1
 
 :: 5. Ativar modo de tela estendida no Windows
-if exist "..\SenaiStreamDisplayCtl.exe" (
-    "..\SenaiStreamDisplayCtl.exe" extend >nul 2>&1
+if %CTL_EXE% neq "" (
+    %CTL_EXE% extend >nul 2>&1
 )
 DisplaySwitch.exe /extend >nul 2>&1
 
-echo [SpaceViewer] Driver e 4 telas virtuais configurados com sucesso!
+echo [SpaceViewer] Driver e telas virtuais configurados com sucesso!
 exit /b 0

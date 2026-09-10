@@ -1,5 +1,5 @@
 // ============================================================
-// SpaceViewer — Native GameStream Host Manager (SenaiStream)
+// SpaceViewer — Native GameStream Host Manager (SpaceviwerStream)
 // Replaces Sunshine with native C++20 GameStream host and
 // manages the virtual display driver for extended desktop streaming.
 // ============================================================
@@ -17,6 +17,7 @@ import type {
   HostDisplayInfo,
   HostSettings,
   VirtualDisplayStatus,
+  VirtualDisplayState,
   MoonlightClient,
   SunshineStreamStats,
   SunshineConfig,
@@ -34,42 +35,57 @@ let _currentDisplayMode: DisplayTopologyMode = 'extended';
 // Path Resolvers
 // ============================================================
 
-export function getSenaiStreamExePath(): string {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'senaistream', 'SenaiStream.exe');
+export function getSpaceviwerStreamExePath(): string {
+  const candidates = [
+    ...(app.isPackaged ? [
+      path.join(process.resourcesPath, 'spaceviwerstream', 'SpaceviwerStream.exe'),
+    ] : []),
+    path.join(app.getAppPath(), 'resources', 'spaceviwerstream', 'SpaceviwerStream.exe'),
+    path.join(process.cwd(), 'resources', 'spaceviwerstream', 'SpaceviwerStream.exe'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
   }
-  const devPath = path.join(app.getAppPath(), 'resources', 'senaistream', 'SenaiStream.exe');
-  if (fs.existsSync(devPath)) return devPath;
-  const cwdPath = path.join(process.cwd(), 'resources', 'senaistream', 'SenaiStream.exe');
-  if (fs.existsSync(cwdPath)) return cwdPath;
-  return devPath;
+  return candidates[0] || path.join(process.cwd(), 'resources', 'spaceviwerstream', 'SpaceviwerStream.exe');
 }
 
 export function getDisplayCtlExePath(): string {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'senaistream', 'SenaiStreamDisplayCtl.exe');
+  const candidates = [
+    ...(app.isPackaged ? [
+      path.join(process.resourcesPath, 'spaceviwerstream', 'SpaceviwerStreamDisplayCtl.exe'),
+    ] : []),
+    path.join(app.getAppPath(), 'resources', 'spaceviwerstream', 'SpaceviwerStreamDisplayCtl.exe'),
+    path.join(process.cwd(), 'resources', 'spaceviwerstream', 'SpaceviwerStreamDisplayCtl.exe'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
   }
-  const devPath = path.join(app.getAppPath(), 'resources', 'senaistream', 'SenaiStreamDisplayCtl.exe');
-  if (fs.existsSync(devPath)) return devPath;
-  const cwdPath = path.join(process.cwd(), 'resources', 'senaistream', 'SenaiStreamDisplayCtl.exe');
-  if (fs.existsSync(cwdPath)) return cwdPath;
-  return devPath;
+  return candidates[0] || path.join(process.cwd(), 'resources', 'spaceviwerstream', 'SpaceviwerStreamDisplayCtl.exe');
 }
 
 export function getVirtualDisplayInfPath(): string {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'senaistream', 'driver', 'virtual-display', 'MttVDD.inf');
+  const candidates = [
+    ...(app.isPackaged ? [
+      path.join(process.resourcesPath, 'spaceviwerstream', 'driver', 'virtual-display', 'MttVDD.inf'),
+    ] : []),
+    path.join(app.getAppPath(), 'resources', 'spaceviwerstream', 'driver', 'virtual-display', 'MttVDD.inf'),
+    path.join(process.cwd(), 'resources', 'spaceviwerstream', 'driver', 'virtual-display', 'MttVDD.inf'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
   }
-  const devPath = path.join(app.getAppPath(), 'resources', 'senaistream', 'driver', 'virtual-display', 'MttVDD.inf');
-  if (fs.existsSync(devPath)) return devPath;
-  const cwdPath = path.join(process.cwd(), 'resources', 'senaistream', 'driver', 'virtual-display', 'MttVDD.inf');
-  if (fs.existsSync(cwdPath)) return cwdPath;
-  return devPath;
+  return candidates[0] || path.join(process.cwd(), 'resources', 'spaceviwerstream', 'driver', 'virtual-display', 'MttVDD.inf');
 }
 
 function getClientsDirectory(): string {
   const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-  return path.join(localAppData, 'SenaiStream', 'clients');
+  const targetDir = path.join(localAppData, 'SpaceviwerStream', 'clients');
+  try {
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+  } catch {}
+  return targetDir;
 }
 
 // ============================================================
@@ -131,7 +147,7 @@ function loopbackRequest(
 }
 
 // ============================================================
-// Process Lifecycle Management (SenaiStream.exe --host)
+// Process Lifecycle Management (SpaceviwerStream.exe --host)
 // ============================================================
 
 export async function checkHostStatus(): Promise<SunshineStatus> {
@@ -145,8 +161,8 @@ export async function checkHostStatus(): Promise<SunshineStatus> {
 
   // Check running process list
   return new Promise((resolve) => {
-    exec('tasklist /fi "imagename eq SenaiStream.exe"', (err, stdout) => {
-      if (!err && stdout.toLowerCase().includes('senaistream.exe')) {
+    exec('tasklist /fi "imagename eq SpaceviwerStream.exe"', (err, stdout) => {
+      if (!err && stdout.toLowerCase().includes('spaceviwerstream.exe')) {
         resolve('running');
       } else {
         resolve('stopped');
@@ -171,7 +187,7 @@ function ensureSunshineConfig(exePath: string): string {
 
   const confDirs = [
     primaryConfDir,
-    path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'SenaiStream', 'config'),
+    path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'SpaceviwerStream', 'config'),
     path.join(os.homedir(), '.config', 'sunshine'),
     path.join(process.env.PROGRAMDATA || 'C:\\ProgramData', 'Sunshine'),
   ];
@@ -193,7 +209,7 @@ function ensureSunshineConfig(exePath: string): string {
 }
 
 export async function startHost(): Promise<boolean> {
-  const exePath = getSenaiStreamExePath();
+  const exePath = getSpaceviwerStreamExePath();
   console.log(`[GameStreamHost] Starting native host at: ${exePath}`);
 
   if (!fs.existsSync(exePath)) {
@@ -201,13 +217,13 @@ export async function startHost(): Promise<boolean> {
     return false;
   }
 
-  // Ensure virtual display settings (4 screens) are synchronized
+  // Ensure virtual display settings are synchronized
   ensureVirtualDisplaySettingsSync();
 
   try {
-    // 1. Terminate any legacy Sunshine processes or stale SenaiStream processes
+    // 1. Terminate any legacy Sunshine processes or stale SpaceviwerStream processes
     await new Promise<void>((resolve) => {
-      exec('taskkill /f /im sunshine.exe /im SenaiStream.exe', () => resolve());
+      exec('taskkill /f /im sunshine.exe /im SpaceviwerStream.exe', () => resolve());
     });
 
     // 2. Short pause for ports to be released
@@ -216,7 +232,7 @@ export async function startHost(): Promise<boolean> {
     // Ensure sunshine config sets host name to spacedesk - [hostname]
     const confPath = ensureSunshineConfig(exePath);
 
-    // 3. Spawn SenaiStream with config file and --host flag
+    // 3. Spawn SpaceviwerStream with config file and --host flag
     hostProcess = spawn(exePath, [confPath, '--host'], {
       cwd: path.dirname(exePath),
       detached: false,
@@ -225,11 +241,11 @@ export async function startHost(): Promise<boolean> {
     });
 
     hostProcess.stdout?.on('data', (data) => {
-      console.log(`[SenaiStream] ${data.toString().trim()}`);
+      console.log(`[SpaceviwerStream] ${data.toString().trim()}`);
     });
 
     hostProcess.stderr?.on('data', (data) => {
-      console.warn(`[SenaiStream] ${data.toString().trim()}`);
+      console.warn(`[SpaceviwerStream] ${data.toString().trim()}`);
     });
 
     hostProcess.on('error', (err) => {
@@ -293,7 +309,7 @@ export async function stopHost(): Promise<void> {
   }
 
   await new Promise<void>((resolve) => {
-    exec('taskkill /f /im SenaiStream.exe', () => resolve());
+    exec('taskkill /f /im SpaceviwerStream.exe', () => resolve());
   });
 }
 
@@ -308,8 +324,23 @@ export function isHostRunning(): boolean {
 }
 
 // ============================================================
-// Virtual Display Driver Management (SenaiStreamDisplayCtl.exe)
+// Virtual Display Driver Management (SpaceviwerStreamDisplayCtl.exe & MttVDD)
 // ============================================================
+
+function runElevatedPnPCommand(command: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const escaped = command.replace(/'/g, "''");
+    const psCmd = `Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-Command','${escaped}' -Verb RunAs -Wait`;
+    exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCmd}"`, (err) => {
+      if (err) {
+        console.error('[VirtualDisplay] Error executing elevated PnP command:', err);
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
+  });
+}
 
 export function ensureVirtualDisplaySettingsSync(): void {
   try {
@@ -326,36 +357,188 @@ export function ensureVirtualDisplaySettingsSync(): void {
       const src = path.join(driverDir, f);
       const dst = path.join(vddDir, f);
       if (fs.existsSync(src)) {
-        if (!fs.existsSync(dst) || f === 'vdd_settings.xml') {
+        if (!fs.existsSync(dst)) {
           try {
             fs.copyFileSync(src, dst);
           } catch {}
         }
       }
     }
-    console.log('[VirtualDisplay] Driver files and 4-screen configuration synced to C:\\VirtualDisplayDriver');
+    console.log('[VirtualDisplay] Driver files synchronized to C:\\VirtualDisplayDriver');
   } catch (err) {
     console.warn('[VirtualDisplay] Warning syncing settings:', err);
   }
 }
 
-export async function getVirtualDisplayStatus(): Promise<VirtualDisplayStatus> {
-  const ctlPath = getDisplayCtlExePath();
-  const vddSettingsExist = fs.existsSync('C:\\VirtualDisplayDriver\\vdd_settings.xml');
+export function writeVirtualDisplayCount(count: number): void {
+  const targetCount = Math.max(1, Math.min(4, count));
+  const paths = [
+    'C:\\VirtualDisplayDriver\\vdd_settings.xml',
+    path.join(path.dirname(getVirtualDisplayInfPath()), 'vdd_settings.xml'),
+  ];
+  for (const p of paths) {
+    try {
+      if (fs.existsSync(p)) {
+        let content = fs.readFileSync(p, 'utf-8');
+        content = content.replace(/<count>\s*\d+\s*<\/count>/i, `<count>${targetCount}</count>`);
+        fs.writeFileSync(p, content, 'utf-8');
+        console.log(`[VirtualDisplay] Updated monitor count to ${targetCount} in ${p}`);
+      }
+    } catch (err) {
+      console.warn(`[VirtualDisplay] Warning updating count in ${p}:`, err);
+    }
+  }
+}
+
+export async function getVirtualDisplayState(): Promise<VirtualDisplayState> {
+  const xmlPath = 'C:\\VirtualDisplayDriver\\vdd_settings.xml';
+  let count = 1;
+  let installed = false;
+
+  if (fs.existsSync(xmlPath)) {
+    installed = true;
+    try {
+      const xml = fs.readFileSync(xmlPath, 'utf-8');
+      const match = xml.match(/<count>\s*(\d+)\s*<\/count>/i);
+      if (match) {
+        count = Math.max(1, Math.min(4, parseInt(match[1], 10)));
+      }
+    } catch {}
+  } else {
+    try {
+      const localXml = path.join(path.dirname(getVirtualDisplayInfPath()), 'vdd_settings.xml');
+      if (fs.existsSync(localXml)) {
+        const xml = fs.readFileSync(localXml, 'utf-8');
+        const match = xml.match(/<count>\s*(\d+)\s*<\/count>/i);
+        if (match) count = Math.max(1, Math.min(4, parseInt(match[1], 10)));
+      }
+    } catch {}
+  }
+
   const displays = typeof screen !== 'undefined' && screen.getAllDisplays ? screen.getAllDisplays() : [];
   const hasMultipleDisplays = displays.length > 1;
 
-  if (!fs.existsSync(ctlPath)) {
-    return { installed: vddSettingsExist || hasMultipleDisplays, active: hasMultipleDisplays };
-  }
-
-  return new Promise((resolve) => {
-    execFile(ctlPath, ['status'], (err) => {
-      // Exit code 0 means device was found in DeviceSet
-      const installed = !err || vddSettingsExist || hasMultipleDisplays;
-      resolve({ installed, active: installed });
+  const isDeviceEnabled = await new Promise<boolean>((resolve) => {
+    exec('pnputil /enum-devices /class Display', (err, stdout) => {
+      if (!err && stdout) {
+        const lower = stdout.toLowerCase();
+        const hasVirtualAdapter =
+          lower.includes('virtual display driver') ||
+          lower.includes('spaceviwerstream_virtual_display') ||
+          lower.includes('mttvdd');
+        if (hasVirtualAdapter) {
+          installed = true;
+          const isDisabled =
+            /virtual display driver[\s\S]*?status:\s*desabilitado/i.test(stdout) ||
+            /spaceviwerstream_virtual_display[\s\S]*?status:\s*desabilitado/i.test(stdout) ||
+            /mttvdd[\s\S]*?status:\s*desabilitado/i.test(stdout);
+          resolve(!isDisabled);
+          return;
+        }
+      }
+      resolve(hasMultipleDisplays);
     });
   });
+
+  return {
+    installed,
+    active: hasMultipleDisplays && isDeviceEnabled,
+    enabled: isDeviceEnabled,
+    count,
+  };
+}
+
+export async function getVirtualDisplayStatus(): Promise<VirtualDisplayStatus> {
+  const state = await getVirtualDisplayState();
+  return {
+    installed: state.installed,
+    active: state.active,
+    enabled: state.enabled,
+    count: state.count,
+  };
+}
+
+export async function setVirtualDisplayCount(
+  count: number
+): Promise<{ success: boolean; count?: number; error?: string }> {
+  const targetCount = Math.max(1, Math.min(4, count));
+  console.log(`[VirtualDisplay] Setting virtual display count to: ${targetCount}`);
+  ensureVirtualDisplaySettingsSync();
+  writeVirtualDisplayCount(targetCount);
+
+  const ok = await runElevatedPnPCommand(
+    'pnputil /enable-device "ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000"; ' +
+    'pnputil /enable-device "ROOT\\MTTVDD\\0000"; ' +
+    'pnputil /restart-device "ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000"; ' +
+    'pnputil /restart-device "ROOT\\MTTVDD\\0000"; ' +
+    'pnputil /restart-device "SWD\\MTT_VDD\\0000"; ' +
+    'DisplaySwitch.exe /extend'
+  );
+
+  const ctlPath = getDisplayCtlExePath();
+  if (fs.existsSync(ctlPath)) {
+    execFile(ctlPath, ['extend'], () => {});
+  }
+  exec('DisplaySwitch.exe /extend', () => {});
+
+  return { success: ok, count: targetCount };
+}
+
+export async function addVirtualDisplay(): Promise<{ success: boolean; count: number; error?: string }> {
+  const state = await getVirtualDisplayState();
+  if (!state.enabled) {
+    const res = await toggleVirtualDisplays(true);
+    return { success: res.success, count: state.count || 1, error: res.error };
+  }
+  if (state.count >= 4) {
+    return { success: false, count: 4, error: 'O limite máximo é de 4 telas virtuais.' };
+  }
+  const newCount = state.count + 1;
+  const res = await setVirtualDisplayCount(newCount);
+  return { success: res.success, count: newCount, error: res.error };
+}
+
+export async function removeVirtualDisplay(): Promise<{ success: boolean; count: number; error?: string }> {
+  const state = await getVirtualDisplayState();
+  if (state.count <= 1) {
+    // Disabling turns off all virtual screens in Windows completely
+    const res = await toggleVirtualDisplays(false);
+    return { success: res.success, count: 0, error: res.error };
+  }
+  const newCount = state.count - 1;
+  const res = await setVirtualDisplayCount(newCount);
+  return { success: res.success, count: newCount, error: res.error };
+}
+
+export async function toggleVirtualDisplays(
+  enabled: boolean
+): Promise<{ success: boolean; error?: string }> {
+  console.log(`[VirtualDisplay] Toggling virtual displays: ${enabled ? 'ENABLE' : 'DISABLE'}`);
+  let cmd = '';
+  if (enabled) {
+    cmd =
+      'pnputil /enable-device "ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000"; ' +
+      'pnputil /enable-device "ROOT\\MTTVDD\\0000"; ' +
+      'pnputil /restart-device "ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000"; ' +
+      'pnputil /restart-device "ROOT\\MTTVDD\\0000"; ' +
+      'DisplaySwitch.exe /extend';
+  } else {
+    cmd =
+      'pnputil /disable-device "ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000"; ' +
+      'pnputil /disable-device "ROOT\\MTTVDD\\0000"';
+  }
+
+  const ok = await runElevatedPnPCommand(cmd);
+
+  if (enabled) {
+    const ctlPath = getDisplayCtlExePath();
+    if (fs.existsSync(ctlPath)) {
+      execFile(ctlPath, ['extend'], () => {});
+    }
+    exec('DisplaySwitch.exe /extend', () => {});
+  }
+
+  return { success: ok };
 }
 
 export async function installVirtualDisplayDriver(): Promise<{
@@ -367,7 +550,7 @@ export async function installVirtualDisplayDriver(): Promise<{
   const infPath = getVirtualDisplayInfPath();
 
   if (!fs.existsSync(ctlPath)) {
-    return { success: false, error: 'Utilitário SenaiStreamDisplayCtl não encontrado.' };
+    return { success: false, error: 'Utilitário SpaceviwerStreamDisplayCtl não encontrado.' };
   }
   if (!fs.existsSync(infPath)) {
     return { success: false, error: 'Driver MttVDD.inf não encontrado.' };
@@ -386,7 +569,7 @@ export async function installVirtualDisplayDriver(): Promise<{
     } else {
       const escapedCtl = ctlPath.replace(/'/g, "''");
       const escapedInf = infPath.replace(/'/g, "''");
-      psScript = `pnputil /add-driver '${escapedInf}' /install; Start-Process -FilePath '${escapedCtl}' -ArgumentList 'ensure', '\`"${escapedInf}\`"' -Verb RunAs -Wait -PassThru; pnputil /restart-device 'ROOT\\SENAISTREAM_VIRTUAL_DISPLAY\\0000'; pnputil /restart-device 'ROOT\\MTTVDD\\0000'; Start-Process -FilePath '${escapedCtl}' -ArgumentList 'extend' -Wait; DisplaySwitch.exe /extend`;
+      psScript = `pnputil /add-driver '${escapedInf}' /install; Start-Process -FilePath '${escapedCtl}' -ArgumentList 'ensure', '\`"${escapedInf}\`"' -Verb RunAs -Wait -PassThru; pnputil /restart-device 'ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000'; pnputil /restart-device 'ROOT\\MTTVDD\\0000'; Start-Process -FilePath '${escapedCtl}' -ArgumentList 'extend' -Wait; DisplaySwitch.exe /extend`;
     }
 
     exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript}"`, (err) => {
@@ -408,7 +591,7 @@ export async function installVirtualDisplayDriver(): Promise<{
 export async function removeVirtualDisplayDriver(): Promise<{ success: boolean; error?: string }> {
   const ctlPath = getDisplayCtlExePath();
   if (!fs.existsSync(ctlPath)) {
-    return { success: false, error: 'Utilitário SenaiStreamDisplayCtl não encontrado.' };
+    return { success: false, error: 'Utilitário SpaceviwerStreamDisplayCtl não encontrado.' };
   }
 
   return new Promise((resolve) => {
@@ -435,7 +618,7 @@ export async function setDisplayMode(
   console.log(`[GameStreamHost] Setting display mode to: ${mode}`);
   _currentDisplayMode = mode;
 
-  // 1. Immediately apply to SenaiStream host settings (virtualDisplay & display 0)
+  // 1. Immediately apply to SpaceviwerStream host settings (virtualDisplay & display 0)
   // When 'duplicate', virtualDisplay is false (streams primary laptop screen)
   // When 'extended', virtualDisplay is true (streams virtual extended display)
   await setHostSettings({
@@ -445,7 +628,7 @@ export async function setDisplayMode(
 
   const targetMode = mode === 'extended' ? 'extend' : 'duplicate';
 
-  // 2. Notify SenaiStream loopback API
+  // 2. Notify SpaceviwerStream loopback API
   await loopbackRequest('POST', '/api/display-mode', { mode: targetMode });
 
   // 3. Switch Windows topology using Windows 11 numeric switches:
@@ -454,7 +637,7 @@ export async function setDisplayMode(
   const winArg = mode === 'extended' ? '3' : '2';
   exec(`DisplaySwitch.exe ${winArg}`, () => {});
 
-  // 4. Also call SenaiStreamDisplayCtl if available
+  // 4. Also call SpaceviwerStreamDisplayCtl if available
   const ctlPath = getDisplayCtlExePath();
   if (fs.existsSync(ctlPath)) {
     execFile(ctlPath, [targetMode], () => {});
@@ -521,7 +704,7 @@ export async function getHostDisplays(): Promise<HostDisplayInfo[]> {
     return list;
   }
 
-  // Fallback: SenaiStream loopback API
+  // Fallback: SpaceviwerStream loopback API
   const res = await loopbackRequest('GET', '/api/displays');
   if (res.status === 200 && res.data && Array.isArray(res.data.displays) && res.data.displays.length > 0) {
     return res.data.displays.map((d: any) => ({
@@ -802,12 +985,16 @@ export async function setSunshineConfig(
 
 export async function setMoonlightScreen(
   sourceId: string,
-  _allSources: ScreenSource[]
+  allSources?: ScreenSource[]
 ): Promise<{ success: boolean; error?: string }> {
   let displayIndex = 0;
   if (sourceId.startsWith('screen:')) {
     const parts = sourceId.split(':');
     displayIndex = parseInt(parts[1] || '0', 10) || 0;
+  } else if (allSources && allSources.length > 0) {
+    const foundIdx = allSources.findIndex((s) => s.id === sourceId);
+    if (foundIdx >= 0) displayIndex = foundIdx;
   }
+  console.log(`[GameStreamHost] Routing Moonlight stream to display index: ${displayIndex} for source: ${sourceId}`);
   return await setHostSettings({ display: displayIndex });
 }

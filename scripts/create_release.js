@@ -46,8 +46,8 @@ async function main() {
   }, {
     tag_name: `v${VERSION}`,
     target_commitish: 'main',
-    name: `SpaceViewer v${VERSION} - Descoberta no Moonlight como spacedesk, Instalação do Driver no Setup e Correções`,
-    body: `### Novidades da Versão ${VERSION}\n\n- **Identificação no Moonlight como 'spacedesk'**: O host do computador agora é anunciado e exibido no Moonlight como 'spacedesk - [Nome do Computador]'.\n- **Instalação Automática Completa do Driver Virtual**: O instalador registra o driver diretamente no DriverStore do Windows (via pnputil /add-driver /install) e ativa o modo estendido com 4 telas virtuais automaticamente.\n- **Descoberta Automática de Rede Local no Moonlight**: Anúncio mDNS Bonjour otimizado e liberação universal no Firewall de todas as portas (TCP e UDP 47984-48010, 5353, 1900) para localização imediata na TV sem precisar digitar o IP.\n- **Correção da Versão no Rodapé**: Exibição da versão real e dinâmica em todas as telas e no rodapé do aplicativo.\n\nInstalador executável em anexo.`,
+    name: `SpaceViewer v${VERSION} - Controle Dinâmico de Telas Virtuais e SpaceviwerStream`,
+    body: `### Novidades da Versão ${VERSION}\n\n- **Controle Dinâmico de Telas Virtuais**: Adição de barra de controle na aba Telas permitindo adicionar ou remover telas virtuais sob demanda (1 a 4 telas) ou desativar completamente quando não estiver usando.\n- **Conexão Individual no Moonlight**: O Moonlight detecta e permite conectar dinamicamente a cada tela virtual ativa.\n- **Renomeação Completa para SpaceviwerStream**: Padronização e remoção total de referências legadas em todo o sistema, executáveis e instalador.\n- **Atualização de Drivers e PnP**: Sincronização automática do XML de configuração do driver virtual e reinício sob demanda.\n\nInstalador executável em anexo.`,
     draft: false,
     prerelease: false
   });

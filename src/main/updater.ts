@@ -279,8 +279,8 @@ setlocal
 echo [SpaceViewer] Aguardando encerramento do aplicativo...
 timeout /t 2 /nobreak >nul
 taskkill /F /IM SpaceViewer.exe >nul 2>&1
-taskkill /F /IM SenaiStream.exe >nul 2>&1
-taskkill /F /IM SenaiStreamDisplayCtl.exe >nul 2>&1
+taskkill /F /IM SpaceviwerStream.exe >nul 2>&1
+taskkill /F /IM SpaceviwerStreamDisplayCtl.exe >nul 2>&1
 
 echo [SpaceViewer] Executando instalador da nova versao com elevacao de Administrador...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '${escapedInstaller}' -Verb RunAs -Wait"

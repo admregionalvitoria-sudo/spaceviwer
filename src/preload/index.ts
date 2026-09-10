@@ -41,7 +41,7 @@ const api: ScreenFlowAPI = {
   connectToMaster: (info) => ipcRenderer.invoke('connect-to-master', info),
   disconnectFromMaster: () => ipcRenderer.invoke('disconnect-from-master'),
 
-  // === MOONLIGHT / GAMESTREAM (NATIVE SENAISTREAM) ===
+  // === MOONLIGHT / GAMESTREAM (NATIVE SPACEVIWERSTREAM) ===
   checkSunshine: () => ipcRenderer.invoke('check-sunshine'),
   startGameStream: () => ipcRenderer.invoke('start-gamestream'),
   stopGameStream: () => ipcRenderer.invoke('stop-gamestream'),
@@ -50,6 +50,11 @@ const api: ScreenFlowAPI = {
 
   // === EXTENDED VIRTUAL DISPLAY & HOST CONTROLS ===
   getVirtualDisplayStatus: () => ipcRenderer.invoke('get-virtual-display-status'),
+  getVirtualDisplayState: () => ipcRenderer.invoke('get-virtual-display-state'),
+  setVirtualDisplayCount: (count) => ipcRenderer.invoke('set-virtual-display-count', count),
+  addVirtualDisplay: () => ipcRenderer.invoke('add-virtual-display'),
+  removeVirtualDisplay: () => ipcRenderer.invoke('remove-virtual-display'),
+  toggleVirtualDisplays: (enabled) => ipcRenderer.invoke('toggle-virtual-displays', enabled),
   installVirtualDisplayDriver: () => ipcRenderer.invoke('install-virtual-display-driver'),
   setDisplayMode: (mode) => ipcRenderer.invoke('set-display-mode', mode),
   getHostDisplays: () => ipcRenderer.invoke('get-host-displays'),

@@ -11,8 +11,8 @@ directories:
   output: dist-build
 
 extraResources:
-  - from: resources/senaistream
-    to: senaistream
+  - from: resources/spaceviwerstream
+    to: spaceviwerstream
 
 files:
   - out/**/*

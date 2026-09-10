@@ -788,7 +788,7 @@ export const MoonlightPanel: React.FC = () => {
                   {localIps[0] || '192.168.x.x'}
                 </span>
               </div>
-              <span className="text-[10px] text-neutral-500">Host Nativo SenaiStream · Portas: 47989 / 47984 / 48010</span>
+              <span className="text-[10px] text-neutral-500">Host Nativo SpaceviwerStream · Portas: 47989 / 47984 / 48010</span>
             </div>
           </GlassCard>
         </div>

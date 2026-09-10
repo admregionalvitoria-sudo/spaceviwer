@@ -16,10 +16,10 @@ echo      SPACEVIEWER - REMOCAO DO DRIVER DE MONITOR VIRTUAL
 echo ====================================================================
 echo.
 
-set CTL_EXE="%~dp0resources\senaistream\SenaiStreamDisplayCtl.exe"
+set CTL_EXE="%~dp0resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe"
 
 if not exist %CTL_EXE% (
-    echo ERRO: Utilitario SenaiStreamDisplayCtl.exe nao encontrado.
+    echo ERRO: Utilitario SpaceviwerStreamDisplayCtl.exe nao encontrado.
     pause
     exit /b 1
 )

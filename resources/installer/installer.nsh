@@ -23,10 +23,10 @@
     Quit
   ${EndIf}
 
-  # Fechar instancias ativas do SpaceViewer e SenaiStream para permitir atualizacao in-place sem travar arquivos
+  # Fechar instancias ativas do SpaceViewer e SpaceviwerStream para permitir atualizacao in-place sem travar arquivos
   nsExec::Exec 'taskkill /F /IM SpaceViewer.exe /T'
-  nsExec::Exec 'taskkill /F /IM SenaiStream.exe /T'
-  nsExec::Exec 'taskkill /F /IM SenaiStreamDisplayCtl.exe /T'
+  nsExec::Exec 'taskkill /F /IM SpaceviwerStream.exe /T'
+  nsExec::Exec 'taskkill /F /IM SpaceviwerStreamDisplayCtl.exe /T'
 
   !ifndef BUILD_UNINSTALLER
     StrCpy $SelectedMode "both"
@@ -105,40 +105,40 @@ FunctionEnd
   FileClose $0
 
   # Instalar driver de tela virtual integrado (extensor de tela para o Moonlight - 4 telas)
-  ${If} ${FileExists} "$INSTDIR\resources\senaistream\driver\virtual-display\MttVDD.inf"
+  ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\driver\virtual-display\MttVDD.inf"
     DetailPrint "Instalando e sincronizando driver de monitor virtual (4 telas)..."
     CreateDirectory "C:\VirtualDisplayDriver"
-    CopyFiles /SILENT "$INSTDIR\resources\senaistream\driver\virtual-display\*.*" "C:\VirtualDisplayDriver\"
+    CopyFiles /SILENT "$INSTDIR\resources\spaceviwerstream\driver\virtual-display\*.*" "C:\VirtualDisplayDriver\"
 
     # 1. Adicionar pacote no Driver Store do Windows (DriverStore)
-    nsExec::ExecToLog 'pnputil /add-driver "$INSTDIR\resources\senaistream\driver\virtual-display\MttVDD.inf" /install'
+    nsExec::ExecToLog 'pnputil /add-driver "$INSTDIR\resources\spaceviwerstream\driver\virtual-display\MttVDD.inf" /install'
     nsExec::ExecToLog 'pnputil /add-driver "C:\VirtualDisplayDriver\MttVDD.inf" /install'
 
     # 2. Registrar dispositivo PnP via utilitário
-    ${If} ${FileExists} "$INSTDIR\resources\senaistream\SenaiStreamDisplayCtl.exe"
-      nsExec::ExecToLog '"$INSTDIR\resources\senaistream\SenaiStreamDisplayCtl.exe" ensure "$INSTDIR\resources\senaistream\driver\virtual-display\MttVDD.inf"'
-      nsExec::ExecToLog '"$INSTDIR\resources\senaistream\SenaiStreamDisplayCtl.exe" ensure "C:\VirtualDisplayDriver\MttVDD.inf"'
+    ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe"
+      nsExec::ExecToLog '"$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe" ensure "$INSTDIR\resources\spaceviwerstream\driver\virtual-display\MttVDD.inf"'
+      nsExec::ExecToLog '"$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe" ensure "C:\VirtualDisplayDriver\MttVDD.inf"'
     ${EndIf}
 
     # 3. Executar script instalador dedicado
-    ${If} ${FileExists} "$INSTDIR\resources\senaistream\driver\install_driver.bat"
-      nsExec::ExecToLog '"$INSTDIR\resources\senaistream\driver\install_driver.bat"'
+    ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\driver\install_driver.bat"
+      nsExec::ExecToLog '"$INSTDIR\resources\spaceviwerstream\driver\install_driver.bat"'
     ${EndIf}
 
     # 4. Reiniciar dispositivos PnP e ativar modo estendido
-    nsExec::ExecToLog 'pnputil /restart-device "ROOT\SENAISTREAM_VIRTUAL_DISPLAY\0000"'
+    nsExec::ExecToLog 'pnputil /restart-device "ROOT\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\0000"'
     nsExec::ExecToLog 'pnputil /restart-device "ROOT\MTTVDD\0000"'
     nsExec::ExecToLog 'pnputil /restart-device "SWD\MTT_VDD\0000"'
-    ${If} ${FileExists} "$INSTDIR\resources\senaistream\SenaiStreamDisplayCtl.exe"
-      nsExec::ExecToLog '"$INSTDIR\resources\senaistream\SenaiStreamDisplayCtl.exe" extend'
+    ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe"
+      nsExec::ExecToLog '"$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe" extend'
     ${EndIf}
     nsExec::Exec 'DisplaySwitch.exe /extend'
   ${EndIf}
 
   # Configurar regras de Firewall para GameStream, Descoberta Multicast e SpaceViewer
   DetailPrint "Configurando regras de firewall para descoberta de rede e Moonlight..."
-  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SenaiStream TCP"'
-  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SenaiStream UDP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream TCP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream UDP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer App TCP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer App UDP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer GameStream Ports TCP"'
@@ -150,10 +150,10 @@ FunctionEnd
   nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer App TCP" dir=in action=allow profile=any program="$INSTDIR\SpaceViewer.exe" enable=yes'
   nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer App UDP" dir=in action=allow profile=any program="$INSTDIR\SpaceViewer.exe" enable=yes'
 
-  # Liberar portas do SenaiStream (GameStream para Moonlight)
-  ${If} ${FileExists} "$INSTDIR\resources\senaistream\SenaiStream.exe"
-    nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer SenaiStream TCP" dir=in action=allow profile=any protocol=TCP localport=47984-48010 program="$INSTDIR\resources\senaistream\SenaiStream.exe" enable=yes'
-    nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer SenaiStream UDP" dir=in action=allow profile=any protocol=UDP localport=47984-48010 program="$INSTDIR\resources\senaistream\SenaiStream.exe" enable=yes'
+  # Liberar portas do SpaceviwerStream (GameStream para Moonlight)
+  ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\SpaceviwerStream.exe"
+    nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream TCP" dir=in action=allow profile=any protocol=TCP localport=47984-48010 program="$INSTDIR\resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes'
+    nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream UDP" dir=in action=allow profile=any protocol=UDP localport=47984-48010 program="$INSTDIR\resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes'
   ${EndIf}
   nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer GameStream Ports TCP" dir=in action=allow profile=any protocol=TCP localport=47984-48010 enable=yes'
   nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer GameStream Ports UDP" dir=in action=allow profile=any protocol=UDP localport=47984-48010 enable=yes'
@@ -171,11 +171,11 @@ FunctionEnd
 !macroend
 
 !macro customUnInstall
-  ${If} ${FileExists} "$INSTDIR\resources\senaistream\SenaiStreamDisplayCtl.exe"
-    nsExec::ExecToLog '"$INSTDIR\resources\senaistream\SenaiStreamDisplayCtl.exe" remove'
+  ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe"
+    nsExec::ExecToLog '"$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe" remove'
   ${EndIf}
-  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SenaiStream TCP"'
-  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SenaiStream UDP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream TCP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream UDP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer App TCP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer App UDP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer Discovery UDP"'

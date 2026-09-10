@@ -34,6 +34,11 @@ import {
   stopHost,
   restartHost,
   getVirtualDisplayStatus,
+  getVirtualDisplayState,
+  setVirtualDisplayCount,
+  addVirtualDisplay,
+  removeVirtualDisplay,
+  toggleVirtualDisplays,
   installVirtualDisplayDriver,
   setDisplayMode,
   getHostDisplays,
@@ -247,7 +252,7 @@ async function createWindow() {
     },
   });
 
-  // Initialize GameStream (Native SenaiStream Host) if in Master mode
+  // Initialize GameStream (Native SpaceviwerStream Host) if in Master mode
   if (installMode === 'master' || installMode === 'both') {
     startHost().then((success) => {
       if (success && mainWindow && !mainWindow.isDestroyed()) {
@@ -447,13 +452,13 @@ function registerIpcHandlers() {
     });
   });
 
-  // Moonlight / GameStream (Native SenaiStream Host)
+  // Moonlight / GameStream (Native SpaceviwerStream Host)
   ipcMain.handle('check-sunshine', async () => {
     return await checkHostStatus();
   });
 
   ipcMain.handle('start-gamestream', async () => {
-    console.log('[Main] Start GameStream (SenaiStream)');
+    console.log('[Main] Start GameStream (SpaceviwerStream)');
     const success = await startHost();
     if (success && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('gamestream-status-changed', 'running');
@@ -462,7 +467,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('stop-gamestream', async () => {
-    console.log('[Main] Stop GameStream (SenaiStream)');
+    console.log('[Main] Stop GameStream (SpaceviwerStream)');
     await stopHost();
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('gamestream-status-changed', 'stopped');
@@ -477,6 +482,26 @@ function registerIpcHandlers() {
   // Extended Virtual Display & Native Controls
   ipcMain.handle('get-virtual-display-status', async () => {
     return await getVirtualDisplayStatus();
+  });
+
+  ipcMain.handle('get-virtual-display-state', async () => {
+    return await getVirtualDisplayState();
+  });
+
+  ipcMain.handle('set-virtual-display-count', async (_, count: number) => {
+    return await setVirtualDisplayCount(count);
+  });
+
+  ipcMain.handle('add-virtual-display', async () => {
+    return await addVirtualDisplay();
+  });
+
+  ipcMain.handle('remove-virtual-display', async () => {
+    return await removeVirtualDisplay();
+  });
+
+  ipcMain.handle('toggle-virtual-displays', async (_, enabled: boolean) => {
+    return await toggleVirtualDisplays(enabled);
   });
 
   ipcMain.handle('install-virtual-display-driver', async () => {

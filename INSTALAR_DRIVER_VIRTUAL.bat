@@ -14,10 +14,10 @@ if %errorLevel% neq 0 (
     exit /b
 )
 
-if exist "resources\senaistream\driver\install_driver.bat" (
-    call "resources\senaistream\driver\install_driver.bat"
+if exist "resources\spaceviwerstream\driver\install_driver.bat" (
+    call "resources\spaceviwerstream\driver\install_driver.bat"
 ) else (
-    echo Arquivo install_driver.bat nao encontrado em resources\senaistream\driver\
+    echo Arquivo install_driver.bat nao encontrado em resources\spaceviwerstream\driver\
 )
 
 echo.

@@ -18,7 +18,7 @@ echo.
 echo Este utilitario resolve problemas de descoberta no Moonlight e Smart TVs:
 echo 1. Ajusta o perfil da rede Wi-Fi para Particular (Privada)
 echo 2. Habilita as portas de descoberta mDNS (5353) e SSDP (1900)
-echo 3. Configura as regras do Firewall do Windows para o SpaceViewer e SenaiStream
+echo 3. Configura as regras do Firewall do Windows para o SpaceViewer e SpaceviwerStream
 echo.
 
 :: 2. Alterar o perfil de rede ativa para Particular (Private)
@@ -44,8 +44,8 @@ echo.
 echo [3/4] Configurando regras do Firewall do Windows...
 
 :: Limpar regras antigas
-netsh advfirewall firewall delete rule name="SpaceViewer SenaiStream TCP" >nul 2>&1
-netsh advfirewall firewall delete rule name="SpaceViewer SenaiStream UDP" >nul 2>&1
+netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream TCP" >nul 2>&1
+netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream UDP" >nul 2>&1
 netsh advfirewall firewall delete rule name="SpaceViewer App TCP" >nul 2>&1
 netsh advfirewall firewall delete rule name="SpaceViewer App UDP" >nul 2>&1
 netsh advfirewall firewall delete rule name="SpaceViewer Discovery UDP" >nul 2>&1
@@ -55,14 +55,14 @@ netsh advfirewall firewall delete rule name="SpaceViewer WebRTC TCP" >nul 2>&1
 netsh advfirewall firewall add rule name="SpaceViewer Discovery UDP" dir=in action=allow profile=any protocol=UDP localport=5353,1900 enable=yes >nul
 echo       - Regra criada: Descoberta Multicast UDP (portas 5353 e 1900)
 
-:: Regras GameStream / SenaiStream para Moonlight (TCP 47984, 47989, 48010 e UDP 47998-48010)
-if exist "C:\Program Files\SpaceViewer\resources\senaistream\SenaiStream.exe" (
-    netsh advfirewall firewall add rule name="SpaceViewer SenaiStream TCP" dir=in action=allow profile=any protocol=TCP localport=47984,47989,48010 program="C:\Program Files\SpaceViewer\resources\senaistream\SenaiStream.exe" enable=yes >nul
-    netsh advfirewall firewall add rule name="SpaceViewer SenaiStream UDP" dir=in action=allow profile=any protocol=UDP localport=47998-48010 program="C:\Program Files\SpaceViewer\resources\senaistream\SenaiStream.exe" enable=yes >nul
+:: Regras GameStream / SpaceviwerStream para Moonlight (TCP 47984, 47989, 48010 e UDP 47998-48010)
+if exist "C:\Program Files\SpaceViewer\resources\spaceviwerstream\SpaceviwerStream.exe" (
+    netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream TCP" dir=in action=allow profile=any protocol=TCP localport=47984,47989,48010 program="C:\Program Files\SpaceViewer\resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes >nul
+    netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream UDP" dir=in action=allow profile=any protocol=UDP localport=47998-48010 program="C:\Program Files\SpaceViewer\resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes >nul
 )
-if exist "%~dp0resources\senaistream\SenaiStream.exe" (
-    netsh advfirewall firewall add rule name="SpaceViewer SenaiStream TCP Dev" dir=in action=allow profile=any protocol=TCP localport=47984,47989,48010 program="%~dp0resources\senaistream\SenaiStream.exe" enable=yes >nul
-    netsh advfirewall firewall add rule name="SpaceViewer SenaiStream UDP Dev" dir=in action=allow profile=any protocol=UDP localport=47998-48010 program="%~dp0resources\senaistream\SenaiStream.exe" enable=yes >nul
+if exist "%~dp0resources\spaceviwerstream\SpaceviwerStream.exe" (
+    netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream TCP Dev" dir=in action=allow profile=any protocol=TCP localport=47984,47989,48010 program="%~dp0resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes >nul
+    netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream UDP Dev" dir=in action=allow profile=any protocol=UDP localport=47998-48010 program="%~dp0resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes >nul
 )
 :: Regra generica de portas GameStream (para garantir em qualquer pasta)
 netsh advfirewall firewall add rule name="SpaceViewer GameStream Ports TCP" dir=in action=allow profile=any protocol=TCP localport=47984,47989,48010 enable=yes >nul

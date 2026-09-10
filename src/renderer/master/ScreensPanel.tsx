@@ -6,6 +6,7 @@ import type {
   DisplayTopologyMode,
   SunshineStatus,
   VirtualDisplayStatus,
+  VirtualDisplayState,
 } from '../../shared/types';
 
 export const ScreensPanel: React.FC = () => {
@@ -16,6 +17,13 @@ export const ScreensPanel: React.FC = () => {
   const [isSwitchingTopology, setIsSwitchingTopology] = useState(false);
   const [moonlightStatus, setMoonlightStatus] = useState<SunshineStatus>('checking');
   const [virtualStatus, setVirtualStatus] = useState<VirtualDisplayStatus>({ installed: false, active: false });
+  const [virtualState, setVirtualState] = useState<VirtualDisplayState>({
+    installed: false,
+    active: false,
+    enabled: false,
+    count: 1,
+  });
+  const [isUpdatingVirtual, setIsUpdatingVirtual] = useState(false);
   const [activatingVirtual, setActivatingVirtual] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -39,9 +47,22 @@ export const ScreensPanel: React.FC = () => {
       const hs = await window.screenflow.checkSunshine();
       setMoonlightStatus(hs);
 
-      // Check virtual display status
-      const vdd = await window.screenflow.getVirtualDisplayStatus();
-      setVirtualStatus(vdd);
+      // Check virtual display state & status
+      try {
+        const vState = await window.screenflow.getVirtualDisplayState();
+        if (vState) {
+          setVirtualState(vState);
+          setVirtualStatus({
+            installed: vState.installed,
+            active: vState.active,
+            enabled: vState.enabled,
+            count: vState.count,
+          });
+        }
+      } catch {
+        const vdd = await window.screenflow.getVirtualDisplayStatus();
+        setVirtualStatus(vdd);
+      }
     } catch (err) {
       console.error('[ScreensPanel] Error loading screens:', err);
     } finally {
@@ -83,6 +104,90 @@ export const ScreensPanel: React.FC = () => {
       setActionMessage('Erro ao alternar modo de exibição.');
     } finally {
       setIsSwitchingTopology(false);
+    }
+  };
+
+  // Toggle Virtual Displays On / Off (Enable / Disable device)
+  const handleToggleVirtualDisplays = async (enable: boolean) => {
+    setIsUpdatingVirtual(true);
+    try {
+      const res = await window.screenflow.toggleVirtualDisplays(enable);
+      if (res.success) {
+        setActionMessage(
+          enable
+            ? 'Telas virtuais ativadas no Windows!'
+            : 'Telas virtuais desativadas! O Windows está agora apenas com seu monitor físico.'
+        );
+        await loadScreensData(true);
+      } else {
+        setActionMessage(res.error || 'Não foi possível alterar as telas virtuais.');
+      }
+    } catch (err: any) {
+      setActionMessage('Erro ao alternar telas virtuais.');
+    } finally {
+      setIsUpdatingVirtual(false);
+      setTimeout(() => setActionMessage(null), 4000);
+    }
+  };
+
+  // Add a Virtual Display (+1)
+  const handleAddVirtualDisplay = async () => {
+    setIsUpdatingVirtual(true);
+    try {
+      const res = await window.screenflow.addVirtualDisplay();
+      if (res.success) {
+        setActionMessage(`Tela virtual adicionada com sucesso! (${res.count} ${res.count === 1 ? 'tela ativa' : 'telas ativas'})`);
+        await loadScreensData(true);
+      } else {
+        setActionMessage(res.error || 'Não foi possível adicionar tela virtual.');
+      }
+    } catch (err: any) {
+      setActionMessage('Erro ao adicionar tela virtual.');
+    } finally {
+      setIsUpdatingVirtual(false);
+      setTimeout(() => setActionMessage(null), 4000);
+    }
+  };
+
+  // Remove a Virtual Display (-1)
+  const handleRemoveVirtualDisplay = async () => {
+    setIsUpdatingVirtual(true);
+    try {
+      const res = await window.screenflow.removeVirtualDisplay();
+      if (res.success) {
+        setActionMessage(
+          res.count === 0
+            ? 'Telas virtuais desativadas do Windows.'
+            : `Tela virtual removida com sucesso! (${res.count} ${res.count === 1 ? 'tela restante' : 'telas restantes'})`
+        );
+        await loadScreensData(true);
+      } else {
+        setActionMessage(res.error || 'Não foi possível remover tela virtual.');
+      }
+    } catch (err: any) {
+      setActionMessage('Erro ao remover tela virtual.');
+    } finally {
+      setIsUpdatingVirtual(false);
+      setTimeout(() => setActionMessage(null), 4000);
+    }
+  };
+
+  // Set explicit count (1, 2, 3, 4)
+  const handleSetVirtualCount = async (count: number) => {
+    setIsUpdatingVirtual(true);
+    try {
+      const res = await window.screenflow.setVirtualDisplayCount(count);
+      if (res.success) {
+        setActionMessage(`${count} ${count === 1 ? 'tela virtual configurada' : 'telas virtuais configuradas'} no Windows!`);
+        await loadScreensData(true);
+      } else {
+        setActionMessage(res.error || 'Erro ao ajustar quantidade de telas.');
+      }
+    } catch (err: any) {
+      setActionMessage('Erro ao configurar telas virtuais.');
+    } finally {
+      setIsUpdatingVirtual(false);
+      setTimeout(() => setActionMessage(null), 4000);
     }
   };
 
@@ -308,25 +413,6 @@ export const ScreensPanel: React.FC = () => {
             </button>
           </div>
 
-          {/* Virtual Display Driver Button */}
-          {!virtualStatus.active && (
-            <button
-              onClick={handleActivateVirtualDisplay}
-              disabled={activatingVirtual}
-              className="px-3.5 py-2 text-xs font-mono font-bold uppercase rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white transition cursor-pointer flex items-center space-x-1.5 shadow-sm"
-              title="Ativar Segunda Tela Virtual para transmissão independente na Smart TV / Moonlight"
-            >
-              {activatingVirtual ? (
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              )}
-              <span>Ativar Tela Virtual MTT</span>
-            </button>
-          )}
-
           {/* Refresh Screens Button */}
           <button
             onClick={() => loadScreensData(true)}
@@ -349,6 +435,116 @@ export const ScreensPanel: React.FC = () => {
             </svg>
             <span>{refreshing ? 'Atualizando...' : 'Atualizar'}</span>
           </button>
+        </div>
+      </GlassCard>
+
+      {/* ── Seção de Gerenciamento de Telas Virtuais (SpaceviwerStream) ── */}
+      <GlassCard className="p-5 border border-neutral-250 shadow-sm relative overflow-hidden bg-gradient-to-br from-white/95 via-white/80 to-indigo-50/40">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          {/* Info & Status */}
+          <div className="space-y-1.5 max-w-xl">
+            <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
+              <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="font-display font-black text-lg text-neutral-900 tracking-tight uppercase">
+                Telas Virtuais (SpaceviwerStream)
+              </h3>
+
+              {/* Status Badge */}
+              {virtualState.enabled && (virtualState.active || virtualCount > 0) ? (
+                <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Ativo • {virtualCount} {virtualCount === 1 ? 'tela virtual' : 'telas virtuais'} no Windows</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-neutral-100 text-neutral-600 border border-neutral-250">
+                  <span className="w-2 h-2 rounded-full bg-neutral-400" />
+                  <span>Desativado • Apenas monitor físico</span>
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-neutral-600 leading-relaxed">
+              Adicione ou remova telas virtuais dinamicamente. Cada tela virtual criada pode ser selecionada para transmissão no Moonlight (Smart TV). Quando terminar, desative-as para liberar sua placa de vídeo e o cursor.
+            </p>
+          </div>
+
+          {/* Controls Bar: Stepper, Quick Counts, Toggle */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">
+            {/* Quick Count Chips */}
+            <div className="flex items-center bg-neutral-100/90 p-1 rounded-xl border border-neutral-250">
+              <span className="text-[10px] font-mono font-bold uppercase px-2 text-neutral-500">Qtd:</span>
+              {[1, 2, 3, 4].map((num) => (
+                <button
+                  key={num}
+                  onClick={() => handleSetVirtualCount(num)}
+                  disabled={isUpdatingVirtual}
+                  className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition cursor-pointer ${
+                    virtualState.enabled && (virtualState.count === num || virtualCount === num)
+                      ? 'bg-neutral-900 text-white shadow-xs'
+                      : 'text-neutral-700 hover:bg-neutral-200/70'
+                  }`}
+                  title={`Configurar exatamente ${num} ${num === 1 ? 'tela virtual' : 'telas virtuais'}`}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+
+            {/* Stepper Buttons (- and +) */}
+            <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-neutral-250 shadow-2xs">
+              <button
+                onClick={handleRemoveVirtualDisplay}
+                disabled={isUpdatingVirtual || (!virtualState.enabled && virtualCount === 0)}
+                className="px-3 py-1.5 text-xs font-mono font-bold rounded-lg bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200 transition cursor-pointer flex items-center space-x-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Remover uma tela virtual"
+              >
+                <svg className="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M20 12H4" />
+                </svg>
+                <span>Remover</span>
+              </button>
+
+              <button
+                onClick={handleAddVirtualDisplay}
+                disabled={isUpdatingVirtual || (virtualState.enabled && virtualState.count >= 4)}
+                className="px-3 py-1.5 text-xs font-mono font-bold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition cursor-pointer flex items-center space-x-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Adicionar uma nova tela virtual"
+              >
+                <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Adicionar</span>
+              </button>
+            </div>
+
+            {/* Toggle Switch Button */}
+            <button
+              onClick={() => handleToggleVirtualDisplays(!virtualState.enabled)}
+              disabled={isUpdatingVirtual}
+              className={`px-4 py-2 text-xs font-mono font-bold uppercase rounded-xl transition cursor-pointer flex items-center space-x-1.5 shadow-sm active:scale-[0.98] ${
+                virtualState.enabled
+                  ? 'bg-neutral-800 hover:bg-neutral-900 text-neutral-100 border border-neutral-700'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              {isUpdatingVirtual ? (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : virtualState.enabled ? (
+                <svg className="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              )}
+              <span>{virtualState.enabled ? 'Desativar Telas' : 'Ativar Telas Virtuais'}</span>
+            </button>
+          </div>
         </div>
       </GlassCard>
 
