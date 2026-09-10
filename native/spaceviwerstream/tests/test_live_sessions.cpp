@@ -236,7 +236,8 @@ namespace {
         EXPECT_EQ(recv(running.audio[i], premature, sizeof(premature), 0), SOCKET_ERROR) << "Audio must wait for ANNOUNCE";
       }
       // Reproduce Moonlight's early ping, then negotiate encryption and nondefault duration.
-      const std::string sdp = "a=x-nv-general.featureFlags:32\r\na=x-nv-aqos.packetDuration:10\r\n";
+      // Moonlight's SdpGenerator appends a space before CRLF to every attribute.
+      const std::string sdp = "a=x-nv-general.featureFlags:167 \r\na=x-nv-aqos.packetDuration:10 \r\n";
       const auto announced = exchange(ip, test_port + 21, "ANNOUNCE rtsp://localhost/ RTSP/1.0\r\nCSeq: 1\r\nContent-length: " + std::to_string(sdp.size()) + "\r\n\r\n" + sdp);
       ASSERT_NE(announced.find("200 OK"), std::string::npos);
       if (std::getenv("SPACEVIEWER_TEST_AUDIO")) {

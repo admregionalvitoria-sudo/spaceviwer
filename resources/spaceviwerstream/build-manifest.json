@@ -69,7 +69,7 @@
                         "path":  "native\\spaceviwerstream\\src\\display_device_main.cpp"
                     },
                     {
-                        "sha256":  "1D7902A75BA4C12BC76A48DDE02FCE5FD0F55686470571FF7D92268AE27A2EAA",
+                        "sha256":  "EB364A1513154DD749DDA091C769D2CC8F568FF450BD35D4139D4BC16C7E823F",
                         "path":  "native\\spaceviwerstream\\src\\gamestream_host.cpp"
                     },
                     {
@@ -115,7 +115,7 @@
                 ],
     "binaries":  [
                      {
-                         "sha256":  "ED0A9CD26C63CABB54FF76C60AEAD49F8E011A1D4F8A1541A3FA5B5A33B0F519",
+                         "sha256":  "03A6935F2A3B1330AFC0924E4703182A45E41C4925A247F93BF90B5E34C23919",
                          "name":  "SpaceviwerStream.exe"
                      },
                      {
@@ -123,6 +123,6 @@
                          "name":  "SpaceviwerStreamDisplayCtl.exe"
                      }
                  ],
-    "version":  "2.2.15",
-    "builtAt":  "2026-09-10T19:43:42.1742611Z"
+    "version":  "2.2.16",
+    "builtAt":  "2026-09-10T20:46:27.3895080Z"
 }

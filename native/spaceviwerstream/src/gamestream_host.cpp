@@ -576,8 +576,16 @@ namespace {
       return {};
     }
     const auto value_start = start + marker.size();
-    const auto end = request.find("\r\n", value_start);
-    return request.substr(value_start, end == std::string_view::npos ? request.size() - value_start : end - value_start);
+    const auto end = request.find_first_of("\r\n", value_start);
+    auto value = request.substr(value_start, end == std::string_view::npos ? request.size() - value_start : end - value_start);
+    // Moonlight serializes attributes as "a=name:value \r\n". Numeric parsing
+    // must see only the value, or encryption flags and packet duration are ignored.
+    const auto first = value.find_first_not_of(" \t");
+    if (first == std::string_view::npos) {
+      return {};
+    }
+    const auto last = value.find_last_not_of(" \t");
+    return value.substr(first, last - first + 1);
   }
 
   /**
@@ -2039,15 +2047,18 @@ namespace senaistream {
               const auto route = routes.get(address);
               const auto display = SessionRoutes::resolve(route, displays);
               std::string capture_error;
+              RuntimeSessionConfig negotiated_audio;
               {
                 std::lock_guard lock(session->mutex);
                 capture_error = session->audio_error;
+                negotiated_audio = session->config;
               }
               list << "{\"address\":\"" << address << "\",\"display\":" << (display ? static_cast<int>(display->index) : -1)
                    << ",\"displayKey\":\"" << escape_json(route.display_key) << "\",\"audioPid\":" << route.audio_pid
                    << ",\"audioMode\":\"" << (route.system_audio ? "system" : route.audio_pid ? "process" :
                                                                                                 "none")
                    << "\",\"audioPackets\":" << session->audio_packets.load() << ",\"audioPeak\":" << session->audio_peak.load()
+                   << ",\"audioEncrypted\":" << (negotiated_audio.encrypt_audio ? "true" : "false") << ",\"audioFrameMs\":" << negotiated_audio.audio_frame_ms
                    << ",\"audioWindow\":\"" << route.audio_window << "\",\"audioName\":\"" << escape_json(route.audio_name)
                    << "\",\"audioError\":\"" << escape_json(capture_error) << "\"}";
             }

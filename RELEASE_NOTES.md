@@ -1,11 +1,9 @@
-## SpaceViewer 2.2.15
+## SpaceViewer 2.2.16
 
-- Adiciona áudio compartilhado nas TVs como padrão para novas conexões, mantendo telas independentes.
-- Captura pelo dispositivo de gravação do VB-CABLE, evitando a captura silenciosa observada no loopback da saída de reprodução.
-- Botão Mesmo áudio em todas as TVs e opção Som do Windows (compartilhado).
-- Mostra sinal capturado e contagem de pacotes enviados por TV.
-- Mantém mute individual e restaura a saída do PC ao encerrar o último áudio ativo.
+- Corrige leitura dos espaços finais nos atributos SDP enviados pelo Moonlight real.
+- Respeita a criptografia e a duração dos pacotes de áudio negociadas, evitando envio de áudio que a TV não consegue decodificar.
+- Mantém áudio compartilhado via VB-CABLE e telas independentes.
 
-Após atualizar, reconecte o Moonlight e selecione Mesmo áudio em todas as TVs. Reproduza o conteúdo em um aplicativo usando a saída padrão do Windows.
+Regressão reproduzida antes da correção: o receptor falhava ao descriptografar pacotes ao usar o formato real do Moonlight (atributos terminados em espaço e CRLF). O teste foi atualizado para preservar esse formato.
 
-Validação: sinal real capturado, criptografado, enviado e decodificado em dois receptores simultâneos, além de testes de telas e isolamento. A reprodução nas TVs físicas ainda precisa ser confirmada pelo usuário.
+Após instalar, reconecte o Moonlight nas TVs para refazer a negociação.
