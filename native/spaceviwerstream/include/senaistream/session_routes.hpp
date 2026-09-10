@@ -15,6 +15,7 @@ namespace senaistream {
     std::uint32_t audio_pid {};  ///< Selected process tree; zero means silence.
     std::uint64_t audio_window {};  ///< Window identity used to detect process reuse.
     std::string audio_name;  ///< Selected application's window title.
+    bool system_audio {true};  ///< Share the virtual playback mix unless explicitly muted or isolated.
   };
 
   /** @brief Assigns separate virtual monitors and retains choices across reconnects. */
@@ -107,6 +108,17 @@ namespace senaistream {
       route.audio_pid = pid;
       route.audio_window = window;
       route.audio_name = std::move(name);
+      route.system_audio = false;
+    }
+
+    /** @brief Selects the shared Windows output for one TV. @param address Client address. */
+    void system_audio(const std::string &address) {
+      std::lock_guard lock(mutex_);
+      auto &route = routes_[address];
+      route.audio_pid = 0;
+      route.audio_window = 0;
+      route.audio_name.clear();
+      route.system_audio = true;
     }
 
   private:

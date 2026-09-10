@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-title SpaceViewer v2.2.14 - Gerador de Executavel Atualizado
+title SpaceViewer v2.2.15 - Gerador de Executavel Atualizado
 color 0b
 
 net session >nul 2>&1
@@ -11,7 +11,7 @@ if %errorLevel% NEQ 0 (
 )
 
 echo ===================================================
-echo             SPACEVIEWER BUILD SYSTEM v2.2.14
+echo             SPACEVIEWER BUILD SYSTEM v2.2.15
 echo ===================================================
 echo.
 echo Diretorio: %CD%
@@ -59,9 +59,9 @@ echo ====================================================================
 echo   CONCLUIDO COM SUCESSO!
 echo.
 echo   Instalador gerado com permissao de Administrador (perMachine: true):
-echo   - dist-package\SpaceViewer-Setup-2.2.14.exe
-echo   - dist-installer\SpaceViewer-Setup-2.2.14.exe
-echo   - dist-electron\SpaceViewer-Setup-2.2.14.exe
+echo   - dist-package\SpaceViewer-Setup-2.2.15.exe
+echo   - dist-installer\SpaceViewer-Setup-2.2.15.exe
+echo   - dist-electron\SpaceViewer-Setup-2.2.15.exe
 echo.
 echo   As telas virtuais sao criadas pelos controles do aplicativo
 echo   (MTT VDD) para que o Moonlight funcione no modo TELA ESTENDIDA!

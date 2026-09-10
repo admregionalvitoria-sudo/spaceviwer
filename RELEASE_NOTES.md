@@ -1,9 +1,11 @@
-## SpaceViewer 2.2.14
+## SpaceViewer 2.2.15
 
-- Corrige o erro HTTP 403 na busca de atualizações causado pelo limite de consultas da API pública do GitHub.
-- Consulta o manifesto público latest.yml, sem token e sem depender da API REST.
-- Valida versão e nome do instalador, limita redirecionamentos e mantém erros de conexão visíveis.
+- Adiciona áudio compartilhado nas TVs como padrão para novas conexões, mantendo telas independentes.
+- Captura pelo dispositivo de gravação do VB-CABLE, evitando a captura silenciosa observada no loopback da saída de reprodução.
+- Botão Mesmo áudio em todas as TVs e opção Som do Windows (compartilhado).
+- Mostra sinal capturado e contagem de pacotes enviados por TV.
+- Mantém mute individual e restaura a saída do PC ao encerrar o último áudio ativo.
 
-Validação: quatro testes do atualizador e consulta/download reais com a API REST retornando 403. Preserva as correções de áudio e telas anteriores.
+Após atualizar, reconecte o Moonlight e selecione Mesmo áudio em todas as TVs. Reproduza o conteúdo em um aplicativo usando a saída padrão do Windows.
 
-Quem estiver com o atualizador bloqueado na versão anterior pode instalar esta versão pelo download direto da release. As próximas consultas usam o novo mecanismo.
+Validação: sinal real capturado, criptografado, enviado e decodificado em dois receptores simultâneos, além de testes de telas e isolamento. A reprodução nas TVs físicas ainda precisa ser confirmada pelo usuário.

@@ -1,7 +1,7 @@
 # SpaceViewer
 
 > **Central de Transmissão, Extensão de Telas e Espelhamento de Alta Performance em Rede Local.**  
-> Versão Atual: **v2.2.12** · Licença: **MIT** · Plataforma Alvo: **Windows 10/11 (x64)**
+> Versão Atual: **v2.2.15** · Licença: **MIT** · Plataforma Alvo: **Windows 10/11 (x64)**
 
 ---
 
@@ -367,20 +367,17 @@ SPACEVIEWER_TEST_CAPTURE=1 cmake-build-spaceviewer/tests/test_sunshine.exe --gte
 Validação automatizada inclui TLS, RTSP, dois clientes ENet, vídeo H.264 por UDP, atualização de captura e cancelamento independente. Isso não substitui a confirmação visual/sonora com os modelos físicos de TV.
 
 
-## Telas e áudio independentes — 2.2.12
+## Telas independentes e áudio compartilhado — 2.2.15
 
-Na aba **Telas** ou **Moonlight**, o painel **Uma tela e um aplicativo para cada TV** permite:
+Na aba **Telas** ou **Moonlight**, cada TV mantém sua própria tela virtual. O áudio compartilhado é o padrão para novas conexões: o som do Windows é direcionado ao VB-CABLE e capturado pelo dispositivo de gravação do cabo, enviado para cada TV com sua própria sessão criptografada.
 
-1. Preparar duas telas virtuais estendidas (o botão também distribui as TVs já conectadas).
-2. Conectar cada TV no Moonlight. Novas conexões recebem telas virtuais livres quando disponíveis.
-3. Escolher **Tela desta TV**. O monitor principal continua disponível para o trabalho local.
-4. Usar **Transmitir aplicativo** na tela virtual correspondente. Se a TV já estiver conectada e o áudio virtual instalado, o áudio desse aplicativo é vinculado à TV.
-5. Ajustar **Áudio exclusivo desta TV** ou selecionar **Sem áudio**.
+1. Conecte as TVs no Moonlight e escolha a tela de cada conexão.
+2. Use **Mesmo áudio em todas as TVs**, ou selecione **Som do Windows (compartilhado)** em cada TV.
+3. Reproduza o conteúdo. O painel mostra sinal capturado e quantidade de pacotes enviados.
+4. **Sem áudio** silencia uma TV; quando todas são silenciadas ou desconectadas, o som volta à saída anterior do PC.
 
-A captura de áudio inclui apenas o processo selecionado e seus filhos, usando a API do Windows build 20348 ou posterior (Windows 11). Duas abas ou janelas que compartilham o mesmo processo não possuem áudio separável; use aplicativos/instâncias independentes. Aplicativos configurados explicitamente para uma saída física devem usar a saída padrão do Windows para não continuarem tocando localmente.
+O som de todos os aplicativos que usam a saída padrão é compartilhado. Aplicativos fixados manualmente em uma saída física devem ser alterados para a saída padrão do Windows. Imagens continuam independentes. A seleção opcional de aplicativo mantém a captura por processo (Windows build 20348+); abas do mesmo processo não são separáveis. Projetar uma janela não substitui o modo compartilhado escolhido.
 
-O VB-CABLE é instalado pelo botão do painel, baixando e verificando o pacote original da VB-Audio. Ele não está incluído no instalador nem no código-fonte deste repositório. É donationware; uso profissional requer a licença do fornecedor: https://vb-audio.com/Services/licensing.htm . O botão pode pedir elevação e o fornecedor recomenda reiniciar após instalar. Nenhuma compra é realizada pelo SpaceViewer.
+VB-CABLE é donationware da VB-Audio; uso profissional requer licença: https://vb-audio.com/Services/licensing.htm . O botão instala o pacote original diretamente do fornecedor, sem compra automática. O instalador do SpaceViewer não inclui o driver.
 
-Enquanto houver uma TV com aplicativo de áudio ativo, a saída padrão do Windows é direcionada ao dispositivo virtual. A saída anterior é restaurada ao terminar a última transmissão com áudio, encerrar o host ou reiniciar após uma interrupção. O áudio dos aplicativos não selecionados não é enviado às TVs. As escolhas de tela são mantidas durante a execução do host e reconexões; após reiniciar o host, a distribuição automática considera novamente as telas disponíveis.
-
-Validação adicional: duas capturas simultâneas em telas virtuais distintas; isolamento de dois processos reproduzindo tons diferentes, codificação/decodificação Opus e restauração da saída local; 33 testes nativos e 11 testes de integração. A reprodução física nas TVs ainda depende da validação do usuário.
+Validação: áudio real da saída virtual recebido simultaneamente por dois clientes UDP, descriptografado e decodificado com energia de sinal não nula; seleção/mute independente, vídeo em duas telas e restauração da saída local. Reprodução nas TVs físicas depende de confirmação do usuário.

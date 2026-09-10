@@ -17,6 +17,9 @@ namespace senaistream {
   struct AudioRecordConfig {
     bool isolate_process {false};  ///< Capture only the selected process tree; zero PID yields silence.
     std::uint32_t process_id {};  ///< Included application process tree.
+    std::wstring endpoint_id;  ///< Explicit shared capture endpoint; empty uses default render loopback.
+    bool endpoint_capture {};  ///< Endpoint is the cable's recording side, not a render loopback.
+    std::function<void(float)> on_peak;  ///< Optional captured PCM peak, before encoding.
     std::uint32_t duration_seconds {10};  ///< Recording duration.
     std::uint32_t bitrate_bps {192'000};  ///< Target Opus bitrate.
     std::uint32_t frame_duration_ms {20};  ///< Opus frame duration in milliseconds.

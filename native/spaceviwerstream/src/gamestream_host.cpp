@@ -85,6 +85,8 @@ namespace {
     std::atomic_uint32_t display {};  ///< Actual selected capture display.
     std::atomic_uint32_t width {}, height {};  ///< Actual encoded resolution.
     std::string audio_error;  ///< Last process-audio capture error.
+    std::atomic_uint64_t audio_packets {};  ///< UDP audio packets successfully sent.
+    std::atomic_uint32_t audio_peak {};  ///< Captured peak in thousandths.
     std::string client_certificate;  ///< Authorized identity used for revocation and resume.
     ENetPeer *control_peer {};  ///< Accessed exclusively by the host event loop.
     std::thread video, audio;  ///< Independent producer threads.
@@ -1516,6 +1518,7 @@ namespace senaistream {
     std::atomic_bool audio_redirected {};
     std::mutex audio_status_mutex;
     std::string audio_error;
+    std::wstring shared_audio_endpoint;
     auto next_audio_check = std::chrono::steady_clock::now();
     const auto restart_capture = [&]() {
       for (const auto &[address, session] : sessions.snapshot()) {
@@ -1546,7 +1549,7 @@ namespace senaistream {
           if (IsWindow(window)) {
             GetWindowThreadProcessId(window, &pid);
           }
-          if (session->active.load() && !session->stop.load() && route.audio_pid && pid == route.audio_pid) {
+          if (session->active.load() && !session->stop.load() && (route.system_audio || (route.audio_pid && pid == route.audio_pid))) {
             needs_audio = true;
           }
         }
@@ -1556,6 +1559,7 @@ namespace senaistream {
         {
           std::lock_guard lock(audio_status_mutex);
           audio_error = audio_status.ok() ? "" : audio_status.message();
+          shared_audio_endpoint = audio_output.active() ? audio_output.endpoint() : L"";
         }
         next_audio_check = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
       }
@@ -1801,7 +1805,7 @@ namespace senaistream {
               negotiated = session_config;
             }
             audio_stream_thread = std::thread(
-              [session, audio_socket, audio_peer, audio_peer_size, negotiated, &media_stop_requested, &routes, &audio_redirected, address = peer_address(peer)]() mutable {
+              [session, audio_socket, audio_peer, audio_peer_size, negotiated, &media_stop_requested, &routes, &audio_redirected, &audio_status_mutex, &shared_audio_endpoint, address = peer_address(peer)]() mutable {
                 // Moonlight starts UDP audio pings after SETUP, before ANNOUNCE.
                 // Keep the peer address, but do not emit audio with pre-negotiation keys/flags.
                 while (!media_stop_requested.load()) {
@@ -1832,7 +1836,16 @@ namespace senaistream {
                   if (IsWindow(window)) {
                     GetWindowThreadProcessId(window, &current_pid);
                   }
-                  config.isolate_process = true;
+                  {
+                    std::lock_guard lock(audio_status_mutex);
+                    config.endpoint_id = shared_audio_endpoint;
+                  }
+                  const bool capturing_shared = route.system_audio && audio_redirected.load() && !config.endpoint_id.empty();
+                  config.isolate_process = !capturing_shared;
+                  config.endpoint_capture = capturing_shared;
+                  config.on_peak = [session](float peak) {
+                    session->audio_peak.store(static_cast<std::uint32_t>(std::clamp(peak, 0.0F, 1.0F) * 1000));
+                  };
                   config.process_id = audio_redirected.load() && current_pid == route.audio_pid ? route.audio_pid : 0;
                   const auto status = AudioRecorder().stream_opus(
                     config,
@@ -1857,6 +1870,7 @@ namespace senaistream {
                       if (sendto(audio_socket, reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()), 0, reinterpret_cast<const sockaddr *>(&audio_peer), audio_peer_size) == SOCKET_ERROR) {
                         return false;
                       }
+                      session->audio_packets.fetch_add(1);
                       if (!announced_first_packet) {
                         std::cout << "First live Opus packet sent\n";
                         announced_first_packet = true;
@@ -1865,7 +1879,7 @@ namespace senaistream {
                       if (IsWindow(window)) {
                         GetWindowThreadProcessId(window, &owner);
                       }
-                      if (owner != current_pid || (route.audio_pid && current_pid == route.audio_pid && !config.process_id && audio_redirected.load())) {
+                      if ((route.system_audio && !capturing_shared && audio_redirected.load()) || owner != current_pid || (route.audio_pid && current_pid == route.audio_pid && !config.process_id && audio_redirected.load())) {
                         session->restart_audio.store(true);
                       }
                       return !media_stop_requested.load() && !session->restart_audio.load();
@@ -2031,6 +2045,9 @@ namespace senaistream {
               }
               list << "{\"address\":\"" << address << "\",\"display\":" << (display ? static_cast<int>(display->index) : -1)
                    << ",\"displayKey\":\"" << escape_json(route.display_key) << "\",\"audioPid\":" << route.audio_pid
+                   << ",\"audioMode\":\"" << (route.system_audio ? "system" : route.audio_pid ? "process" :
+                                                                                                "none")
+                   << "\",\"audioPackets\":" << session->audio_packets.load() << ",\"audioPeak\":" << session->audio_peak.load()
                    << ",\"audioWindow\":\"" << route.audio_window << "\",\"audioName\":\"" << escape_json(route.audio_name)
                    << "\",\"audioError\":\"" << escape_json(capture_error) << "\"}";
             }
@@ -2059,6 +2076,7 @@ namespace senaistream {
             const auto form = "/?" + std::string(http_body(request));
             const auto address = std::string(query_value(form, "address"));
             const auto session = sessions.find(address);
+            const bool shared_audio = query_value(form, "mode") == "system";
             const auto handle_text = query_value(form, "window");
             std::uint64_t handle = 0;
             const auto parsed = std::from_chars(handle_text.data(), handle_text.data() + handle_text.size(), handle);
@@ -2069,7 +2087,7 @@ namespace senaistream {
             }
             if (!session || session->stop.load() || parsed.ec != std::errc {} || parsed.ptr != handle_text.data() + handle_text.size() || (handle && !pid)) {
               response = http_response("400 Bad Request", "text/plain", "Aplicativo ou TV indisponivel.");
-            } else if (handle && !virtual_audio_available.load()) {
+            } else if ((handle || shared_audio) && !virtual_audio_available.load()) {
               response = http_response("409 Conflict", "text/plain", "Instale o driver de audio virtual primeiro.");
             } else {
               wchar_t title[1024] {};
@@ -2080,7 +2098,11 @@ namespace senaistream {
               if (handle) {
                 WideCharToMultiByte(CP_UTF8, 0, title, -1, utf8, sizeof(utf8), nullptr, nullptr);
               }
-              routes.audio(address, pid, handle, utf8);
+              if (shared_audio) {
+                routes.system_audio(address);
+              } else {
+                routes.audio(address, pid, handle, utf8);
+              }
               {
                 std::lock_guard lock(session->mutex);
                 session->audio_error.clear();

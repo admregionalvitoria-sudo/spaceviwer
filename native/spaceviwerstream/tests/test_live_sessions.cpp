@@ -150,6 +150,32 @@ namespace {
     }
   };
 
+  /** @brief Owns a tone played into the redirected output, never a user process. */
+  struct SharedTone {
+    PROCESS_INFORMATION process {};  ///< Owned child handles.
+
+    /** @brief Starts a ten-second tone in the sibling test executable. */
+    SharedTone() {
+      wchar_t executable[MAX_PATH] {};
+      GetModuleFileNameW(nullptr, executable, MAX_PATH);
+      const auto path = std::filesystem::path(executable).parent_path() / "test_audio_source.exe";
+      std::wstring command = L"\"" + path.wstring() + L"\" 440";
+      STARTUPINFOW startup {};
+      startup.cb = sizeof(startup);
+      CreateProcessW(path.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process);
+    }
+
+    /** @brief Stops only the owned tone before local output restoration. */
+    ~SharedTone() {
+      if (process.hProcess) {
+        TerminateProcess(process.hProcess, 0);
+        WaitForSingleObject(process.hProcess, 2000);
+        CloseHandle(process.hProcess);
+        CloseHandle(process.hThread);
+      }
+    }
+  };
+
   TEST(LiveSessions, TwoControlClientsSurviveCaptureRefreshAndIndependentCancel) {
     WSADATA winsock {};
     ASSERT_EQ(WSAStartup(MAKEWORD(2, 2), &winsock), 0);
@@ -276,6 +302,59 @@ namespace {
       }
     }
     ASSERT_EQ(connected, 2);
+    if (std::getenv("SPACEVIEWER_TEST_AUDIO")) {
+      for (int attempt = 0; attempt < 30; ++attempt) {
+        running.pump();
+        status = exchange("127.0.0.1", test_port + 1, "GET /api/audio-status HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        if (status.find("\"redirected\":true") != std::string::npos) {
+          break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      }
+      ASSERT_NE(status.find("\"redirected\":true"), std::string::npos) << status;
+      SharedTone tone;
+      ASSERT_NE(tone.process.dwProcessId, 0U);
+      double energy[2] {};
+      int error = 0;
+      OpusDecoder *decoders[2] {opus_decoder_create(48000, 2, &error), opus_decoder_create(48000, 2, &error)};
+      for (int frame = 0; frame < 150; ++frame) {
+        running.pump();
+        for (int index = 0; index < 2; ++index) {
+          unsigned char packet[1400], plain[1400], key[16], iv[16] {};
+          const int size = recv(running.audio[index], reinterpret_cast<char *>(packet), sizeof(packet), 0);
+          ASSERT_GT(size, 12);
+          std::fill_n(key, 16, index == 0 ? 0x11 : 0x22);
+          const unsigned nonce = ((packet[2] << 8) | packet[3]) + 1;
+          iv[0] = nonce >> 24;
+          iv[1] = nonce >> 16;
+          iv[2] = nonce >> 8;
+          iv[3] = nonce;
+          auto *context = EVP_CIPHER_CTX_new();
+          int length = 0, tail = 0;
+          ASSERT_EQ(EVP_DecryptInit_ex(context, EVP_aes_128_cbc(), nullptr, key, iv), 1);
+          ASSERT_EQ(EVP_DecryptUpdate(context, plain, &length, packet + 12, size - 12), 1);
+          const int result = EVP_DecryptFinal_ex(context, plain + length, &tail);
+          EVP_CIPHER_CTX_free(context);
+          ASSERT_EQ(result, 1);
+          float pcm[960];
+          const int samples = opus_decode_float(decoders[index], plain, length + tail, pcm, 480, 0);
+          ASSERT_EQ(samples, 480);
+          for (int sample = 0; sample < samples * 2; ++sample) {
+            energy[index] += pcm[sample] * pcm[sample];
+          }
+        }
+      }
+      for (auto *decoder : decoders) {
+        opus_decoder_destroy(decoder);
+      }
+      EXPECT_GT(energy[0], 1.0) << "First TV must receive audible shared audio, not just valid silence packets";
+      EXPECT_GT(energy[1], 1.0) << "Second TV must receive audible shared audio simultaneously";
+      std::cout << "Shared audio decoded energies: " << energy[0] << ", " << energy[1] << '\n';
+      EXPECT_NE(exchange("127.0.0.1", test_port + 1, post("/api/session-audio", "address=127.0.0.2&window=0")).find("200 OK"), std::string::npos);
+      EXPECT_NE(exchange("127.0.0.1", test_port + 1, "GET /api/audio-status HTTP/1.1\r\nHost: localhost\r\n\r\n").find("\"redirected\":true"), std::string::npos);
+      EXPECT_NE(exchange("127.0.0.1", test_port + 1, post("/api/session-audio", "address=127.0.0.2&window=0&mode=system")).find("200 OK"), std::string::npos);
+    }
+
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
     status = exchange("127.0.0.1", test_port + 1, status_request);
     EXPECT_NE(status.find("\"activeClients\":2"), std::string::npos) << status;

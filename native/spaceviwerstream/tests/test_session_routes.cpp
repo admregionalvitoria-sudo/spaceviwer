@@ -46,4 +46,19 @@ namespace {
     EXPECT_EQ(routes.get("tv2").display_key, "virtual:1");
     EXPECT_EQ(routes.get("tv2").audio_pid, 0u);
   }
+
+  TEST(SessionRoutes, SharedAudioDefaultsAndPerTvMuteRemainIndependent) {
+    SessionRoutes routes;
+    auto screens = catalog();
+    routes.attach("tv1", screens, 0);
+    routes.attach("tv2", screens, 0);
+    EXPECT_TRUE(routes.get("tv1").system_audio);
+    EXPECT_TRUE(routes.get("tv2").system_audio);
+    routes.audio("tv1", 0, 0, "");
+    EXPECT_FALSE(routes.get("tv1").system_audio);
+    EXPECT_TRUE(routes.get("tv2").system_audio);
+    routes.system_audio("tv1");
+    EXPECT_TRUE(routes.get("tv1").system_audio);
+    EXPECT_EQ(routes.get("tv1").audio_pid, 0U);
+  }
 }  // namespace

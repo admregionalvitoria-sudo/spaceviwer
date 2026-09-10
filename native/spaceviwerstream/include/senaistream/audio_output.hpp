@@ -17,6 +17,8 @@ namespace senaistream {
     bool available() const;
     /** @brief Returns whether the output is currently redirected. @return Active state. */
     bool active() const;
+    /** @brief Gets the virtual cable's recording endpoint carrying redirected playback. @return Capture endpoint ID. */
+    std::wstring endpoint() const;
 
   private:
     struct Implementation;

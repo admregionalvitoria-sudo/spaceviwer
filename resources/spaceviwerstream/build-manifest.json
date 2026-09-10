@@ -1,11 +1,11 @@
 ﻿{
     "sources":  [
                     {
-                        "sha256":  "19AB4DC427F6F07E2CB118C4DC69D600AEA905F2A001F69E0BE8B42A02D651C7",
+                        "sha256":  "B8FAAA218A46B52F68D0E6AC0A712A44A5EB1FC6B27E6B7506B0AA9ECD2DC89F",
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\audio_output.hpp"
                     },
                     {
-                        "sha256":  "3052DD18D996D3AB7984E5C47587CF8DC64DA7307D207F87ADBF9ACCCFE51138",
+                        "sha256":  "6D243751746B992337E65E4B918F3C4D7F8AA2B5C5CF9CA04A6FDD0FED3D43EA",
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\audio_recorder.hpp"
                     },
                     {
@@ -33,7 +33,7 @@
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\session_registry.hpp"
                     },
                     {
-                        "sha256":  "60003448666125F8FA5AE3B7A7BE39D15A66484675CB986FCA57B7275AFC2B98",
+                        "sha256":  "8D9DFCE9EA0B3850DC4FC830240C5807194EAB3424ED459D542F1A0491C3B349",
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\session_routes.hpp"
                     },
                     {
@@ -53,11 +53,11 @@
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\video_types.hpp"
                     },
                     {
-                        "sha256":  "5BA0E737964BBE8DDB79ABB36FEA70EFEDDDC6750C4EADD4BE26938B6FDE9F3B",
+                        "sha256":  "7354B1061F07D45E341D8BF140DB07B9DE47F5A414E47E1DF155F96EFDDB9DCA",
                         "path":  "native\\spaceviwerstream\\src\\audio_output.cpp"
                     },
                     {
-                        "sha256":  "F9F3EB1748B8DECE0BFD6F4EDD8B7688D0EEEC5A97922274741FE45B26FACF55",
+                        "sha256":  "761B2E862C58AA94E1704438D769E43F4865E4203F4C1023E6C504DB8A7BE227",
                         "path":  "native\\spaceviwerstream\\src\\audio_recorder.cpp"
                     },
                     {
@@ -69,7 +69,7 @@
                         "path":  "native\\spaceviwerstream\\src\\display_device_main.cpp"
                     },
                     {
-                        "sha256":  "79A0D208326A1610DDD47031BA5BF45733EC4375A9B649BC09BFD5A3311F387E",
+                        "sha256":  "1D7902A75BA4C12BC76A48DDE02FCE5FD0F55686470571FF7D92268AE27A2EAA",
                         "path":  "native\\spaceviwerstream\\src\\gamestream_host.cpp"
                     },
                     {
@@ -115,7 +115,7 @@
                 ],
     "binaries":  [
                      {
-                         "sha256":  "B1280F6909F54C8C92826FB630F836D8F0D2527E62EB8F7F5618317458138163",
+                         "sha256":  "ED0A9CD26C63CABB54FF76C60AEAD49F8E011A1D4F8A1541A3FA5B5A33B0F519",
                          "name":  "SpaceviwerStream.exe"
                      },
                      {
@@ -123,6 +123,6 @@
                          "name":  "SpaceviwerStreamDisplayCtl.exe"
                      }
                  ],
-    "version":  "2.2.14",
-    "builtAt":  "2026-09-10T19:15:53.5586317Z"
+    "version":  "2.2.15",
+    "builtAt":  "2026-09-10T19:43:42.1742611Z"
 }

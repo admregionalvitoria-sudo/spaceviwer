@@ -210,8 +210,8 @@ export async function setNativeSessionDisplay(address: string, display: number) 
 
 export async function setNativeSessionAudio(address: string, sourceId: string) {
   const match = /^window:(\d+):/.exec(sourceId);
-  if (sourceId !== 'none' && !match) return { success: false, error: 'Selecione uma janela de aplicativo válida.' };
-  return result(await nativeRequest('POST', '/api/session-audio', { address, window: match?.[1] || '0' }));
+  if (sourceId !== 'none' && sourceId !== 'system' && !match) return { success: false, error: 'Selecione uma janela de aplicativo válida.' };
+  return result(await nativeRequest('POST', '/api/session-audio', { address, window: match?.[1] || '0', mode: sourceId === 'system' ? 'system' : 'process' }));
 }
 export async function getNativeAudioStatus(): Promise<NativeAudioStatus> {
   const response = await nativeRequest('GET', '/api/audio-status');
@@ -236,6 +236,7 @@ export async function setProjectedApplicationAudio(sourceId: string, displayId: 
   const target = native && (await getHostDisplays()).find(item => item.deviceName.toLowerCase() === native.deviceName.toLowerCase());
   if (!target || !(await getNativeAudioStatus()).installed) return;
   for (const session of await getNativeSessions()) if (session.display === target.index) {
+    if (session.audioMode === 'system') continue;
     const changed = await setNativeSessionAudio(session.address, sourceId);
     if (!changed.success) throw new Error(changed.error);
   }

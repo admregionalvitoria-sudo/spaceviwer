@@ -706,7 +706,7 @@ namespace senaistream {
         return failure("MMDeviceEnumerator creation", result);
       }
       ComPtr<IMMDevice> device;
-      result = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+      result = config.endpoint_id.empty() ? enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device) : enumerator->GetDevice(config.endpoint_id.c_str(), &device);
       if (FAILED(result)) {
         return failure("GetDefaultAudioEndpoint", result);
       }
@@ -725,7 +725,7 @@ namespace senaistream {
     }
     result = audio_client->Initialize(
       AUDCLNT_SHAREMODE_SHARED,
-      AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+      (config.endpoint_capture && !config.isolate_process ? 0 : AUDCLNT_STREAMFLAGS_LOOPBACK) | AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
       0,
       0,
       format.get(),
@@ -845,6 +845,13 @@ namespace senaistream {
         const auto available = std::min(frame_values, pending_samples.size());
         std::copy_n(pending_samples.begin(), available, frame.begin());
         pending_samples.erase(pending_samples.begin(), pending_samples.begin() + static_cast<std::ptrdiff_t>(available));
+        if (config.on_peak) {
+          float peak = 0;
+          for (const auto value : frame) {
+            peak = std::max(peak, std::abs(value));
+          }
+          config.on_peak(peak);
+        }
         const auto encoded_size = opus_encode_float(
           encoder.get(),
           frame.data(),

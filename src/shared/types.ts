@@ -412,6 +412,9 @@ declare global {
 
 
 export interface NativeSession {
+  audioMode?: 'system' | 'process' | 'none';
+  audioPackets?: number;
+  audioPeak?: number;
   address: string;
   display: number;
   displayKey: string;

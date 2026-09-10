@@ -67,6 +67,7 @@ namespace senaistream {
         return {};
       }
       UINT count = 0;
+      std::wstring fallback;
       devices->GetCount(&count);
       for (UINT i = 0; i < count; ++i) {
         ComPtr<IMMDevice> device;
@@ -79,10 +80,17 @@ namespace senaistream {
         bool matches = name.vt == VT_LPWSTR && name.pwszVal && (std::wstring(name.pwszVal).find(L"VB-Audio Virtual Cable") != std::wstring::npos || std::wstring(name.pwszVal).find(L"Virtual Audio Driver by MTT") != std::wstring::npos);
         PropVariantClear(&name);
         if (matches) {
-          return device_id(device.Get());
+          PROPVARIANT label {};
+          properties->GetValue(PKEY_Device_FriendlyName, &label);
+          const bool multichannel = label.vt == VT_LPWSTR && label.pwszVal && std::wstring(label.pwszVal).find(L"16 Ch") != std::wstring::npos;
+          PropVariantClear(&label);
+          if (multichannel) {
+            return device_id(device.Get());
+          }
+          fallback = device_id(device.Get());
         }
       }
-      return {};
+      return fallback;
     }
 
     /** @brief Reads one default playback role. @param role Role. @return ID. */
@@ -144,11 +152,36 @@ namespace senaistream {
   }
 
   bool AudioOutput::available() const {
-    return !implementation_->find_sink().empty();
+    return !implementation_->find_sink().empty() && !endpoint().empty();
   }
 
   bool AudioOutput::active() const {
     return implementation_->redirected;
+  }
+
+  std::wstring AudioOutput::endpoint() const {
+    auto &state = *implementation_;
+    ComPtr<IMMDeviceCollection> devices;
+    if (!state.enumerator || FAILED(state.enumerator->EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE, &devices))) {
+      return {};
+    }
+    UINT count = 0;
+    devices->GetCount(&count);
+    for (UINT i = 0; i < count; ++i) {
+      ComPtr<IMMDevice> device;
+      ComPtr<IPropertyStore> properties;
+      if (FAILED(devices->Item(i, &device)) || FAILED(device->OpenPropertyStore(STGM_READ, &properties))) {
+        continue;
+      }
+      PROPVARIANT name {};
+      properties->GetValue(PKEY_Device_FriendlyName, &name);
+      const bool matches = name.vt == VT_LPWSTR && name.pwszVal && std::wstring(name.pwszVal).find(L"VB-Audio Virtual Cable") != std::wstring::npos;
+      PropVariantClear(&name);
+      if (matches) {
+        return device_id(device.Get());
+      }
+    }
+    return {};
   }
 
   Status AudioOutput::update(bool enabled) {
@@ -160,7 +193,7 @@ namespace senaistream {
       return Status::success();
     }
     state.sink = state.find_sink();
-    if (state.sink.empty()) {
+    if (state.sink.empty() || endpoint().empty()) {
       return Status::failure("Instale o driver de audio virtual para ouvir somente nas TVs.");
     }
     if (!state.policy) {

@@ -155,3 +155,12 @@ test('audio can be silenced independently for one TV', async () => {
   const mutation = calls.find(call => call.path === '/api/session-audio');
   assert.equal(new URLSearchParams(mutation.body).get('window'), '0');
 });
+test('shared Windows audio uses the system mode for the selected TV', async () => {
+  const { api, calls } = hostFixture();
+  assert.equal((await api.setNativeSessionAudio('10.0.0.22', 'system')).success, true);
+  const mutation = calls.find(call => call.path === '/api/session-audio');
+  const form = new URLSearchParams(mutation.body);
+  assert.equal(form.get('mode'), 'system');
+  assert.equal(form.get('window'), '0');
+  assert.equal(form.get('address'), '10.0.0.22');
+});
