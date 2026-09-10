@@ -1,15 +1,10 @@
-## SpaceViewer 2.2.12
+## SpaceViewer 2.2.13
 
-- Distribuição automática de telas virtuais diferentes por conexão Moonlight, com escolha manual por TV.
-- Painel de atribuição também na aba Telas; botão para preparar telas estendidas e distribuir conexões existentes.
-- Áudio por aplicativo/processo, independente para cada TV. Sem aplicativo selecionado, a TV recebe silêncio.
-- Projeções vinculam o áudio do aplicativo à TV conectada àquela tela, quando a saída virtual está instalada.
-- Saída VB-CABLE opcional, instalada diretamente do fornecedor, para ouvir nas TVs sem reproduzir na saída padrão do PC.
-- Restauração da saída local ao encerrar a transmissão e recuperação após interrupções.
-- Monitor virtual removido não provoca transmissão automática do monitor principal.
+- Corrige áudio silencioso quando o Moonlight envia o primeiro ping UDP antes de concluir o ANNOUNCE: o servidor aguarda os parâmetros finais de criptografia e duração antes de transmitir.
+- Ajusta os timestamps de áudio para os milissegundos esperados pelo GameStream.
+- Usa Opus com tamanho constante, compatível com os blocos de áudio do receptor Moonlight.
+- Preserva a atribuição independente de telas e aplicativos por TV da versão 2.2.12.
 
-Uso: prepare as telas, conecte as TVs, escolha a tela de cada conexão e o aplicativo em Áudio exclusivo desta TV. Duas abas/janelas do mesmo processo compartilham áudio; use aplicativos ou instâncias independentes. A captura por processo requer Windows build 20348+ (Windows 11).
+Validação: 33 testes nativos, incluindo dois clientes com ping anterior ao ANNOUNCE, recepção UDP, descriptografia com chaves distintas, decodificação Opus e captura isolada de dois aplicativos; 11 testes de integração e verificação TypeScript.
 
-VB-CABLE é donationware da VB-Audio; o uso profissional requer licença do fornecedor. O download é feito pelo botão no app, sem compra automática: https://vb-audio.com/Services/licensing.htm . Aplicativos fixados manualmente em uma saída física devem usar a saída padrão do Windows.
-
-Validação: 33 testes nativos e 11 testes de integração, incluindo dois monitores virtuais reais, vídeo simultâneo, dois tons isolados por processo e restauração do áudio local. Reprodução física nas TVs ainda depende da confirmação do usuário.
+Após atualizar, reconecte o Moonlight e selecione o aplicativo em Áudio exclusivo desta TV. A reprodução nas TVs físicas ainda precisa ser confirmada pelo usuário.

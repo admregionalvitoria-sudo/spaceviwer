@@ -17,7 +17,7 @@
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\gamestream_host.hpp"
                     },
                     {
-                        "sha256":  "FE4C3E74271BA5D30180EAB39A2763E87C0AC43BD409E395A1033F020969DEB2",
+                        "sha256":  "8B602948E0DD52EA9295D085257723A43BD0EEB4951E2614BF2CD3AD0B8CB7F0",
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\moonlight_audio_packetizer.hpp"
                     },
                     {
@@ -57,7 +57,7 @@
                         "path":  "native\\spaceviwerstream\\src\\audio_output.cpp"
                     },
                     {
-                        "sha256":  "31838F9E5C939A8F54C2A437CFC2CE98588F6F411A2E4FCDA40F7B043917F996",
+                        "sha256":  "F9F3EB1748B8DECE0BFD6F4EDD8B7688D0EEEC5A97922274741FE45B26FACF55",
                         "path":  "native\\spaceviwerstream\\src\\audio_recorder.cpp"
                     },
                     {
@@ -69,7 +69,7 @@
                         "path":  "native\\spaceviwerstream\\src\\display_device_main.cpp"
                     },
                     {
-                        "sha256":  "B2E18A67FBBAD8EC20DFD926567E5917CBC79ADD4D369BE8241424D5B74FBCE1",
+                        "sha256":  "79A0D208326A1610DDD47031BA5BF45733EC4375A9B649BC09BFD5A3311F387E",
                         "path":  "native\\spaceviwerstream\\src\\gamestream_host.cpp"
                     },
                     {
@@ -81,7 +81,7 @@
                         "path":  "native\\spaceviwerstream\\src\\management_page.hpp"
                     },
                     {
-                        "sha256":  "52DB04EE851F7FE9F32C0C69EED2F65213FD6F62FC5E5180338F8AA1BB496E1D",
+                        "sha256":  "51E0A37AD4EFF5AE3C39CEE094AE5A6BACB20182FE52B399E456EE9CC1FA653A",
                         "path":  "native\\spaceviwerstream\\src\\moonlight_audio_packetizer.cpp"
                     },
                     {
@@ -115,7 +115,7 @@
                 ],
     "binaries":  [
                      {
-                         "sha256":  "E9A16315F9973230A82EBE3F13D84E888A524E56C3F10EA320E989FFD6321CC2",
+                         "sha256":  "B1280F6909F54C8C92826FB630F836D8F0D2527E62EB8F7F5618317458138163",
                          "name":  "SpaceviwerStream.exe"
                      },
                      {
@@ -123,6 +123,6 @@
                          "name":  "SpaceviwerStreamDisplayCtl.exe"
                      }
                  ],
-    "version":  "2.2.12",
-    "builtAt":  "2026-09-10T18:31:29.2285801Z"
+    "version":  "2.2.13",
+    "builtAt":  "2026-09-10T18:54:49.0151558Z"
 }

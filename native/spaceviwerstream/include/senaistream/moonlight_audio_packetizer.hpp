@@ -18,13 +18,14 @@ namespace senaistream {
    * @brief Wraps one Opus frame in the RTP layout consumed by Moonlight.
    *
    * @param opus Encoded Opus frame, optionally encrypted by the caller.
-   * @param timestamp_48khz RTP timestamp in 48 kHz sample units.
+   * @param timestamp_ms GameStream RTP timestamp in milliseconds (not standard 48 kHz RTP units).
    * @param state Per-session sequence and source state.
    * @return Complete UDP datagram.
    */
   [[nodiscard]] std::vector<std::uint8_t> packetize_opus_frame(
     std::span<const std::uint8_t> opus,
-    std::uint32_t timestamp_48khz,
-    AudioPacketizerState &state);
+    std::uint32_t timestamp_ms,
+    AudioPacketizerState &state
+  );
 
 }  // namespace senaistream

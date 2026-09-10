@@ -18,7 +18,7 @@ try {
     }
     $sources = Get-ChildItem -LiteralPath (Join-Path $root 'native\spaceviwerstream\src'), (Join-Path $root 'native\spaceviwerstream\include') -File -Recurse |
         Sort-Object FullName | ForEach-Object { @{ path = $_.FullName.Substring($root.Length + 1); sha256 = (Get-Sha256 $_.FullName) } }
-    @{ version = '2.2.12'; builtAt = (Get-Date).ToUniversalTime().ToString('o'); sources = @($sources); binaries = @(
+    @{ version = '2.2.13'; builtAt = (Get-Date).ToUniversalTime().ToString('o'); sources = @($sources); binaries = @(
         Get-ChildItem -LiteralPath $destination -Filter '*.exe' | ForEach-Object { @{ name = $_.Name; sha256 = (Get-Sha256 $_.FullName) } }
     ) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $destination 'build-manifest.json') -Encoding UTF8
 } finally { Pop-Location }

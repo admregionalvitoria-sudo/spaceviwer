@@ -56,6 +56,7 @@ namespace {
     std::uint32_t audio_frame_ms {5};  ///< Requested Opus packet duration.
     bool ready {};  ///< Whether the key and identifier were parsed from launch.
     bool encrypt_audio {};  ///< Whether Moonlight requested encrypted audio.
+    bool audio_announced {};  ///< ANNOUNCE has supplied the final audio transport parameters.
   };
 
   /**
@@ -1800,7 +1801,22 @@ namespace senaistream {
               negotiated = session_config;
             }
             audio_stream_thread = std::thread(
-              [session, audio_socket, audio_peer, audio_peer_size, negotiated, &media_stop_requested, &routes, &audio_redirected, address = peer_address(peer)]() {
+              [session, audio_socket, audio_peer, audio_peer_size, negotiated, &media_stop_requested, &routes, &audio_redirected, address = peer_address(peer)]() mutable {
+                // Moonlight starts UDP audio pings after SETUP, before ANNOUNCE.
+                // Keep the peer address, but do not emit audio with pre-negotiation keys/flags.
+                while (!media_stop_requested.load()) {
+                  {
+                    std::scoped_lock lock(session->mutex);
+                    negotiated = session->config;
+                  }
+                  if (negotiated.audio_announced) {
+                    break;
+                  }
+                  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+                if (media_stop_requested.load()) {
+                  return;
+                }
                 AudioRecordConfig config;
                 config.duration_seconds = 86'400;
                 config.bitrate_bps = 192'000;
@@ -1837,7 +1853,7 @@ namespace senaistream {
                       }
                       static_cast<void>(timestamp_48khz);
                       const auto packet = packetize_opus_frame(opus, next_timestamp, packetizer_state);
-                      next_timestamp += 48 * negotiated.audio_frame_ms;
+                      next_timestamp += negotiated.audio_frame_ms;
                       if (sendto(audio_socket, reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()), 0, reinterpret_cast<const sockaddr *>(&audio_peer), audio_peer_size) == SOCKET_ERROR) {
                         return false;
                       }
@@ -1919,6 +1935,7 @@ namespace senaistream {
               std::scoped_lock lock(session_mutex);
               updated = session_config;
             }
+            updated.audio_announced = true;
             std::uint32_t feature_flags = 0;
             if (parse_decimal(sdp_attribute(request, "x-nv-general.featureFlags"), feature_flags)) {
               updated.encrypt_audio = (feature_flags & 0x20U) != 0;

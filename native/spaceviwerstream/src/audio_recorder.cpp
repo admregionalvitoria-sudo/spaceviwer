@@ -768,6 +768,10 @@ namespace senaistream {
     std::unique_ptr<OpusEncoder, LiveEncoderDeleter> encoder(raw_encoder);
     opus_error = opus_encoder_ctl(encoder.get(), OPUS_SET_BITRATE(static_cast<int>(config.bitrate_bps)));
     if (opus_error == OPUS_OK) {
+      // Moonlight groups four RTP audio payloads into equal-size recovery shards.
+      opus_error = opus_encoder_ctl(encoder.get(), OPUS_SET_VBR(0));
+    }
+    if (opus_error == OPUS_OK) {
       opus_error = opus_encoder_ctl(encoder.get(), OPUS_SET_INBAND_FEC(1));
     }
     if (opus_error == OPUS_OK) {

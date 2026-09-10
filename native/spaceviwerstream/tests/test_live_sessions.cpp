@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
+#include <opus.h>
 #include <thread>
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -82,6 +83,7 @@ namespace {
     ENetHost *first {}, *second {};  ///< Simulated TVs.
     SSL_CTX *tls {};  ///< Paired client identity.
     SOCKET video[2] {INVALID_SOCKET, INVALID_SOCKET};  ///< Optional real capture receivers.
+    SOCKET audio[2] {INVALID_SOCKET, INVALID_SOCKET};  ///< Receivers that ping before negotiation.
 
     /** @brief Pumps client acknowledgements while waiting for video. */
     void pump() {
@@ -126,6 +128,11 @@ namespace {
         worker.join();
       }
       for (auto socket : video) {
+        if (socket != INVALID_SOCKET) {
+          closesocket(socket);
+        }
+      }
+      for (auto socket : audio) {
         if (socket != INVALID_SOCKET) {
           closesocket(socket);
         }
@@ -191,9 +198,61 @@ namespace {
       const std::string launch = "GET /launch?rikey=" + std::string(32, i == 0 ? '1' : '2') + "&rikeyid=1&mode=320x240x5 HTTP/1.1\r\nHost: localhost\r\n\r\n";
       const auto launched = exchange(ip, test_port - 5, launch, running.tls);
       ASSERT_NE(launched.find("<gamesession>1</gamesession>"), std::string::npos) << launched;
-      // Announce each client's media parameters on a separate RTSP transaction.
-      const auto announced = exchange(ip, test_port + 21, "ANNOUNCE rtsp://localhost/ RTSP/1.0\r\nCSeq: 1\r\nContent-length: 0\r\n\r\n");
+      if (std::getenv("SPACEVIEWER_TEST_AUDIO")) {
+        running.audio[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        auto localAudio = address(ip, 0);
+        ASSERT_EQ(bind(running.audio[i], reinterpret_cast<const sockaddr *>(&localAudio.address), localAudio.addressLength), 0);
+        auto destination = address("127.0.0.1", test_port + 11);
+        ASSERT_EQ(sendto(running.audio[i], "PING", 4, 0, reinterpret_cast<const sockaddr *>(&destination.address), destination.addressLength), 4);
+        DWORD timeout = 250;
+        setsockopt(running.audio[i], SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&timeout), sizeof(timeout));
+        char premature[1400];
+        EXPECT_EQ(recv(running.audio[i], premature, sizeof(premature), 0), SOCKET_ERROR) << "Audio must wait for ANNOUNCE";
+      }
+      // Reproduce Moonlight's early ping, then negotiate encryption and nondefault duration.
+      const std::string sdp = "a=x-nv-general.featureFlags:32\r\na=x-nv-aqos.packetDuration:10\r\n";
+      const auto announced = exchange(ip, test_port + 21, "ANNOUNCE rtsp://localhost/ RTSP/1.0\r\nCSeq: 1\r\nContent-length: " + std::to_string(sdp.size()) + "\r\n\r\n" + sdp);
       ASSERT_NE(announced.find("200 OK"), std::string::npos);
+      if (std::getenv("SPACEVIEWER_TEST_AUDIO")) {
+        DWORD timeout = 5000;
+        setsockopt(running.audio[i], SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&timeout), sizeof(timeout));
+        int error = 0;
+        auto *decoder = opus_decoder_create(48000, 2, &error);
+        ASSERT_EQ(error, OPUS_OK);
+        std::uint32_t previous = 0;
+        int packetSize = 0;
+        for (int frame = 0; frame < 8; ++frame) {
+          unsigned char packet[1400], plain[1400], keyBytes[16], iv[16] {};
+          std::fill_n(keyBytes, 16, i == 0 ? 0x11 : 0x22);
+          const int size = recv(running.audio[i], reinterpret_cast<char *>(packet), sizeof(packet), 0);
+          ASSERT_GT(size, 12);
+          EXPECT_EQ(packet[1], 97);
+          const unsigned sequence = (packet[2] << 8) | packet[3];
+          const std::uint32_t timestamp = (std::uint32_t(packet[4]) << 24) | (packet[5] << 16) | (packet[6] << 8) | packet[7];
+          if (frame) {
+            EXPECT_EQ(timestamp - previous, 10U);
+            EXPECT_EQ(size, packetSize);
+          }
+          previous = timestamp;
+          packetSize = size;
+          const auto nonce = sequence + 1;
+          iv[0] = nonce >> 24;
+          iv[1] = nonce >> 16;
+          iv[2] = nonce >> 8;
+          iv[3] = nonce;
+          auto *context = EVP_CIPHER_CTX_new();
+          ASSERT_NE(context, nullptr);
+          int written = 0, finalBytes = 0;
+          ASSERT_EQ(EVP_DecryptInit_ex(context, EVP_aes_128_cbc(), nullptr, keyBytes, iv), 1);
+          ASSERT_EQ(EVP_DecryptUpdate(context, plain, &written, packet + 12, size - 12), 1);
+          const auto valid = EVP_DecryptFinal_ex(context, plain + written, &finalBytes);
+          EVP_CIPHER_CTX_free(context);
+          ASSERT_EQ(valid, 1) << "Moonlight must decrypt audio using negotiated per-TV keys";
+          float pcm[960];
+          EXPECT_EQ(opus_decode_float(decoder, plain, written + finalBytes, pcm, 480, 0), 480);
+        }
+        opus_decoder_destroy(decoder);
+      }
       auto local = address(ip, 0);
       auto *client = enet_host_create(AF_INET, &local, 1, 48, 0, 0);
       ASSERT_NE(client, nullptr);
