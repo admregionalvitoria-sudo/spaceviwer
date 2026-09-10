@@ -90,7 +90,10 @@ async function main() {
   if (uploadUrl) {
     const finalUploadUrl = uploadUrl.replace('{?name,label}', `?name=SpaceViewer-Setup-${VERSION}.exe`);
     const parsed = new URL(finalUploadUrl);
-    let exePath = path.resolve(__dirname, `../dist-build/SpaceViewer-Setup-${VERSION}.exe`);
+    let exePath = path.resolve(__dirname, `../dist-package/SpaceViewer-Setup-${VERSION}.exe`);
+    if (!fs.existsSync(exePath)) {
+      exePath = path.resolve(__dirname, `../dist-build/SpaceViewer-Setup-${VERSION}.exe`);
+    }
     if (!fs.existsSync(exePath)) {
       exePath = path.resolve(__dirname, `../dist-installer/SpaceViewer-Setup-${VERSION}.exe`);
     }
