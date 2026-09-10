@@ -34,6 +34,31 @@ export const ScreensPanel: React.FC = () => {
   const [searchFilter, setSearchFilter] = useState('');
   const [projectingScreenId, setProjectingScreenId] = useState<string | null>(null);
 
+  // Context Menu State (Right-click on screens or grid)
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    screen?: DetailedScreenInfo;
+  }>({ visible: false, x: 0, y: 0 });
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+  }, []);
+
+  useEffect(() => {
+    const handleClick = () => closeContextMenu();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeContextMenu();
+    };
+    window.addEventListener('click', handleClick);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('click', handleClick);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [closeContextMenu]);
+
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load all screens with rich previews and metadata
@@ -472,52 +497,32 @@ export const ScreensPanel: React.FC = () => {
             </p>
           </div>
 
-          {/* Controls Bar: Stepper, Quick Counts, Toggle */}
+          {/* Controls Bar: Add, Remove, Toggle */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">
-            {/* Quick Count Chips */}
-            <div className="flex items-center bg-neutral-100/90 p-1 rounded-xl border border-neutral-250">
-              <span className="text-[10px] font-mono font-bold uppercase px-2 text-neutral-500">Qtd:</span>
-              {[1, 2, 3, 4].map((num) => (
-                <button
-                  key={num}
-                  onClick={() => handleSetVirtualCount(num)}
-                  disabled={isUpdatingVirtual}
-                  className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition cursor-pointer ${
-                    virtualState.enabled && (virtualState.count === num || virtualCount === num)
-                      ? 'bg-neutral-900 text-white shadow-xs'
-                      : 'text-neutral-700 hover:bg-neutral-200/70'
-                  }`}
-                  title={`Configurar exatamente ${num} ${num === 1 ? 'tela virtual' : 'telas virtuais'}`}
-                >
-                  {num}
-                </button>
-              ))}
-            </div>
-
             {/* Stepper Buttons (- and +) */}
             <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-neutral-250 shadow-2xs">
               <button
                 onClick={handleRemoveVirtualDisplay}
                 disabled={isUpdatingVirtual || (!virtualState.enabled && virtualCount === 0)}
-                className="px-3 py-1.5 text-xs font-mono font-bold rounded-lg bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200 transition cursor-pointer flex items-center space-x-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3.5 py-2 text-xs font-mono font-bold rounded-lg bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200 transition cursor-pointer flex items-center space-x-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Remover uma tela virtual"
               >
                 <svg className="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M20 12H4" />
                 </svg>
-                <span>Remover</span>
+                <span>Remover Tela</span>
               </button>
 
               <button
                 onClick={handleAddVirtualDisplay}
                 disabled={isUpdatingVirtual || (virtualState.enabled && virtualState.count >= 4)}
-                className="px-3 py-1.5 text-xs font-mono font-bold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition cursor-pointer flex items-center space-x-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3.5 py-2 text-xs font-mono font-bold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition cursor-pointer flex items-center space-x-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Adicionar uma nova tela virtual"
               >
                 <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
                 </svg>
-                <span>Adicionar</span>
+                <span>Adicionar Tela</span>
               </button>
             </div>
 
@@ -573,14 +578,26 @@ export const ScreensPanel: React.FC = () => {
           </button>
         </GlassCard>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          onContextMenu={(e) => {
+            if ((e.target as HTMLElement).closest('.screen-card')) return;
+            e.preventDefault();
+            setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+          }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative"
+        >
           {screens.map((screen, idx) => {
             const isProjecting = Boolean(screen.projectedApp);
 
             return (
               <GlassCard
                 key={screen.displayId || screen.id}
-                className="p-4 flex flex-col justify-between space-y-3 overflow-hidden border border-neutral-200/90 hover:border-neutral-400 transition-all duration-300 shadow-sm hover:shadow-md group relative rounded-2xl"
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setContextMenu({ visible: true, x: e.clientX, y: e.clientY, screen });
+                }}
+                className="screen-card p-4 flex flex-col justify-between space-y-3 overflow-hidden border border-neutral-200/90 hover:border-neutral-400 transition-all duration-300 shadow-sm hover:shadow-md group relative rounded-2xl"
               >
                 {/* Card Top Header */}
                 <div className="flex items-start justify-between gap-2">
@@ -637,9 +654,27 @@ export const ScreensPanel: React.FC = () => {
                     </div>
                   </div>
 
-                  <span className="font-mono text-[10px] font-black text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200 shrink-0">
-                    #{idx + 1}
-                  </span>
+                  <div className="flex items-center space-x-1.5 shrink-0">
+                    {screen.isVirtual && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveVirtualDisplay();
+                        }}
+                        disabled={isUpdatingVirtual}
+                        className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer flex items-center space-x-1 shadow-2xs active:scale-95"
+                        title="Remover esta tela virtual do Windows"
+                      >
+                        <svg className="w-3 h-3 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Remover</span>
+                      </button>
+                    )}
+                    <span className="font-mono text-[10px] font-black text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200">
+                      #{idx + 1}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Compact Live Preview Container */}
@@ -759,6 +794,51 @@ export const ScreensPanel: React.FC = () => {
               </GlassCard>
             );
           })}
+
+          {/* Card Interativo: Adicionar Nova Tela Virtual */}
+          <div
+            onClick={() => {
+              if (!isUpdatingVirtual && (!virtualState.enabled || virtualState.count < 4)) {
+                handleAddVirtualDisplay();
+              }
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+            }}
+            className={`screen-card p-6 flex flex-col items-center justify-center text-center space-y-4 rounded-2xl border-2 border-dashed transition-all duration-300 min-h-[300px] select-none ${
+              isUpdatingVirtual || (virtualState.enabled && virtualState.count >= 4)
+                ? 'border-neutral-250 bg-neutral-50/50 opacity-60 cursor-not-allowed'
+                : 'border-indigo-300 hover:border-indigo-500 bg-gradient-to-b from-indigo-50/40 via-white/80 to-white hover:bg-indigo-50/70 shadow-xs hover:shadow-lg hover:scale-[1.01] cursor-pointer group'
+            }`}
+          >
+            <div className="w-14 h-14 rounded-2xl bg-indigo-600 group-hover:bg-indigo-700 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-all">
+              {isUpdatingVirtual ? (
+                <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                </svg>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-display font-black text-base text-neutral-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors flex items-center justify-center space-x-1.5">
+                <span>Adicionar Tela Virtual</span>
+              </h3>
+              <p className="text-xs text-neutral-500 max-w-[220px] leading-relaxed mx-auto">
+                {virtualState.enabled && virtualState.count >= 4
+                  ? 'Limite máximo de 4 telas virtuais atingido no Windows.'
+                  : 'Criar novo monitor virtual no Windows para utilizar ou transmitir no Moonlight.'}
+              </p>
+            </div>
+
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase bg-indigo-100/80 text-indigo-900 border border-indigo-200">
+              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+              <span>{virtualCount} de 4 Telas Criadas</span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -939,6 +1019,95 @@ export const ScreensPanel: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Menu de Contexto Flutuante (Botão Direito) */}
+      {contextMenu.visible && (
+        <div
+          style={{
+            top: `${Math.min(contextMenu.y, window.innerHeight - 200)}px`,
+            left: `${Math.min(contextMenu.x, window.innerWidth - 240)}px`,
+          }}
+          className="fixed z-50 min-w-[230px] bg-white/95 backdrop-blur-md border border-neutral-300 rounded-2xl shadow-2xl p-1.5 animate-in fade-in zoom-in-95 duration-100 text-neutral-800"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase text-neutral-400 border-b border-neutral-100 mb-1 flex items-center justify-between">
+            <span>{contextMenu.screen ? contextMenu.screen.name : 'Gerenciar Telas'}</span>
+            {contextMenu.screen?.isVirtual && (
+              <span className="text-[8px] bg-indigo-50 text-indigo-700 px-1 py-0.2 rounded border border-indigo-200">
+                Virtual
+              </span>
+            )}
+          </div>
+
+          <button
+            onClick={() => {
+              closeContextMenu();
+              handleAddVirtualDisplay();
+            }}
+            disabled={isUpdatingVirtual || (virtualState.enabled && virtualState.count >= 4)}
+            className="w-full text-left px-3 py-2 text-xs font-mono font-bold rounded-xl hover:bg-indigo-50 hover:text-indigo-700 flex items-center space-x-2.5 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <div className="w-5 h-5 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <span>Adicionar Tela Virtual</span>
+          </button>
+
+          {contextMenu.screen?.isVirtual && (
+            <button
+              onClick={() => {
+                closeContextMenu();
+                handleRemoveVirtualDisplay();
+              }}
+              disabled={isUpdatingVirtual}
+              className="w-full text-left px-3 py-2 text-xs font-mono font-bold rounded-xl hover:bg-rose-50 hover:text-rose-700 flex items-center space-x-2.5 transition cursor-pointer disabled:opacity-40"
+            >
+              <div className="w-5 h-5 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <span>Remover Esta Tela</span>
+            </button>
+          )}
+
+          {contextMenu.screen && !contextMenu.screen.isMoonlightTarget && (
+            <button
+              onClick={() => {
+                if (contextMenu.screen) handleSetMoonlightScreen(contextMenu.screen);
+                closeContextMenu();
+              }}
+              className="w-full text-left px-3 py-2 text-xs font-mono font-bold rounded-xl hover:bg-cyan-50 hover:text-cyan-700 flex items-center space-x-2.5 transition cursor-pointer"
+            >
+              <div className="w-5 h-5 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center shrink-0">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              </div>
+              <span>Definir no Moonlight</span>
+            </button>
+          )}
+
+          <div className="border-t border-neutral-150 my-1" />
+
+          <button
+            onClick={() => {
+              closeContextMenu();
+              loadScreensData(true);
+            }}
+            className="w-full text-left px-3 py-2 text-xs font-mono rounded-xl hover:bg-neutral-100 flex items-center space-x-2.5 transition cursor-pointer text-neutral-600"
+          >
+            <div className="w-5 h-5 rounded-lg bg-neutral-100 text-neutral-500 flex items-center justify-center shrink-0">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </div>
+            <span>Atualizar Lista de Telas</span>
+          </button>
         </div>
       )}
 

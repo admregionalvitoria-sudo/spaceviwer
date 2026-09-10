@@ -46,8 +46,8 @@ async function main() {
   }, {
     tag_name: `v${VERSION}`,
     target_commitish: 'main',
-    name: `SpaceViewer v${VERSION} - Controle Dinâmico de Telas Virtuais e SpaceviwerStream`,
-    body: `### Novidades da Versão ${VERSION}\n\n- **Controle Dinâmico de Telas Virtuais**: Adição de barra de controle na aba Telas permitindo adicionar ou remover telas virtuais sob demanda (1 a 4 telas) ou desativar completamente quando não estiver usando.\n- **Conexão Individual no Moonlight**: O Moonlight detecta e permite conectar dinamicamente a cada tela virtual ativa.\n- **Renomeação Completa para SpaceviwerStream**: Padronização e remoção total de referências legadas em todo o sistema, executáveis e instalador.\n- **Atualização de Drivers e PnP**: Sincronização automática do XML de configuração do driver virtual e reinício sob demanda.\n\nInstalador executável em anexo.`,
+    name: `SpaceViewer v${VERSION} - Novo Card de Adição de Telas, Menu de Botão Direito e PnP`,
+    body: `### Novidades da Versão ${VERSION}\n\n- **Card de Adicionar Tela Virtual**: Card dedicado no grid com botão '+' para criar novas telas virtuais diretamente entre os monitores.\n- **Menu de Contexto com Botão Direito**: Clique com o botão direito em cima de qualquer tela ou na área de monitores para adicionar ou remover telas virtuais rapidamente.\n- **Botão Direto de Remoção**: Cada tela virtual conta agora com botão 'Remover' no cabeçalho do card.\n- **Correção da Criação no Windows PnP**: Identificação automática de todas as instâncias do driver e reinício dinâmico para carregar a nova tela virtual imediatamente sem travar.\n\nInstalador executável em anexo.`,
     draft: false,
     prerelease: false
   });

@@ -6,6 +6,7 @@ interface GlassCardProps {
   className?: string;
   glowColor?: 'cyan' | 'purple' | 'green' | 'none';
   onClick?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export const GlassCard: React.FC<GlassCardProps> = ({
@@ -13,6 +14,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   className,
   glowColor = 'none',
   onClick,
+  onContextMenu,
 }) => {
   const glowClasses = {
     cyan: 'shadow-cyan-glow hover:border-black/25',
@@ -24,6 +26,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   return (
     <div
       onClick={onClick}
+      onContextMenu={onContextMenu}
       className={clsx(
         'glass-panel glass-panel-hover rounded-2xl p-6 relative overflow-hidden',
         onClick && 'cursor-pointer select-none active:scale-[0.98]',

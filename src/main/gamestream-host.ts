@@ -4,7 +4,7 @@
 // manages the virtual display driver for extended desktop streaming.
 // ============================================================
 
-import { spawn, exec, execFile, ChildProcess } from 'child_process';
+import { spawn, exec, execFile, execFileSync, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -458,6 +458,13 @@ export async function getVirtualDisplayStatus(): Promise<VirtualDisplayStatus> {
   };
 }
 
+const VIRTUAL_DISPLAY_DEVICE_IDS = [
+  'ROOT\\SENAISTREAM_VIRTUAL_DISPLAY\\0000',
+  'ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000',
+  'ROOT\\MTTVDD\\0000',
+  'SWD\\MTT_VDD\\0000',
+];
+
 export async function setVirtualDisplayCount(
   count: number
 ): Promise<{ success: boolean; count?: number; error?: string }> {
@@ -466,16 +473,29 @@ export async function setVirtualDisplayCount(
   ensureVirtualDisplaySettingsSync();
   writeVirtualDisplayCount(targetCount);
 
+  // 1. Trigger DisplayCtl ensure & extend
+  const ctlPath = getDisplayCtlExePath();
+  const infPath = getVirtualDisplayInfPath();
+  if (fs.existsSync(ctlPath)) {
+    if (fs.existsSync(infPath)) {
+      try {
+        execFileSync(ctlPath, ['ensure', infPath], { stdio: 'ignore' });
+      } catch {}
+    }
+    try {
+      execFileSync(ctlPath, ['extend'], { stdio: 'ignore' });
+    } catch {}
+  }
+
+  // 2. Restart virtual display device instances in PnP
+  const enableAndRestartCmd = VIRTUAL_DISPLAY_DEVICE_IDS.map(
+    (id) => `pnputil /enable-device "${id}" & pnputil /restart-device "${id}"`
+  ).join(' & ');
+
   const ok = await runElevatedPnPCommand(
-    'pnputil /enable-device "ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000"; ' +
-    'pnputil /enable-device "ROOT\\MTTVDD\\0000"; ' +
-    'pnputil /restart-device "ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000"; ' +
-    'pnputil /restart-device "ROOT\\MTTVDD\\0000"; ' +
-    'pnputil /restart-device "SWD\\MTT_VDD\\0000"; ' +
-    'DisplaySwitch.exe /extend'
+    `${enableAndRestartCmd} & DisplaySwitch.exe /extend`
   );
 
-  const ctlPath = getDisplayCtlExePath();
   if (fs.existsSync(ctlPath)) {
     execFile(ctlPath, ['extend'], () => {});
   }
@@ -501,7 +521,7 @@ export async function addVirtualDisplay(): Promise<{ success: boolean; count: nu
 export async function removeVirtualDisplay(): Promise<{ success: boolean; count: number; error?: string }> {
   const state = await getVirtualDisplayState();
   if (state.count <= 1) {
-    // Disabling turns off all virtual screens in Windows completely
+    // If only 1 virtual screen is left, removing it turns off virtual screens
     const res = await toggleVirtualDisplays(false);
     return { success: res.success, count: 0, error: res.error };
   }
@@ -516,24 +536,28 @@ export async function toggleVirtualDisplays(
   console.log(`[VirtualDisplay] Toggling virtual displays: ${enabled ? 'ENABLE' : 'DISABLE'}`);
   let cmd = '';
   if (enabled) {
-    cmd =
-      'pnputil /enable-device "ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000"; ' +
-      'pnputil /enable-device "ROOT\\MTTVDD\\0000"; ' +
-      'pnputil /restart-device "ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000"; ' +
-      'pnputil /restart-device "ROOT\\MTTVDD\\0000"; ' +
-      'DisplaySwitch.exe /extend';
+    ensureVirtualDisplaySettingsSync();
+    const enables = VIRTUAL_DISPLAY_DEVICE_IDS.map(
+      (id) => `pnputil /enable-device "${id}" & pnputil /restart-device "${id}"`
+    ).join(' & ');
+    cmd = `${enables} & DisplaySwitch.exe /extend`;
   } else {
-    cmd =
-      'pnputil /disable-device "ROOT\\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\\0000"; ' +
-      'pnputil /disable-device "ROOT\\MTTVDD\\0000"';
+    const disables = VIRTUAL_DISPLAY_DEVICE_IDS.map(
+      (id) => `pnputil /disable-device "${id}"`
+    ).join(' & ');
+    cmd = disables;
   }
 
   const ok = await runElevatedPnPCommand(cmd);
 
   if (enabled) {
     const ctlPath = getDisplayCtlExePath();
+    const infPath = getVirtualDisplayInfPath();
     if (fs.existsSync(ctlPath)) {
-      execFile(ctlPath, ['extend'], () => {});
+      if (fs.existsSync(infPath)) {
+        try { execFile(ctlPath, ['ensure', infPath], () => {}); } catch {}
+      }
+      try { execFile(ctlPath, ['extend'], () => {}); } catch {}
     }
     exec('DisplaySwitch.exe /extend', () => {});
   }
