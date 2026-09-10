@@ -79,13 +79,22 @@ export function getVirtualDisplayInfPath(): string {
 
 function getClientsDirectory(): string {
   const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-  const targetDir = path.join(localAppData, 'SpaceviwerStream', 'clients');
+  const targetDir = path.join(localAppData, 'SpaceViewer', 'clients');
   try {
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
   } catch {}
   return targetDir;
+}
+
+function getAllClientDirectories(): string[] {
+  const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+  return [
+    path.join(localAppData, 'SpaceViewer', 'clients'),
+    path.join(localAppData, 'SpaceviwerStream', 'clients'),
+    path.join(localAppData, 'senaistream', 'clients'),
+  ];
 }
 
 // ============================================================
@@ -159,6 +168,18 @@ export async function checkHostStatus(): Promise<SunshineStatus> {
     }
   } catch {}
 
+  // Check GameStream port 47989 directly
+  try {
+    const isUp = await new Promise<boolean>((resolve) => {
+      const req = http.get('http://127.0.0.1:47989/serverinfo?uniqueid=probe-status', { timeout: 1000 }, (r) => {
+        resolve(r.statusCode === 200);
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => { req.destroy(); resolve(false); });
+    });
+    if (isUp) return 'running';
+  } catch {}
+
   // Check running process list
   return new Promise((resolve) => {
     exec('tasklist /fi "imagename eq SpaceviwerStream.exe"', (err, stdout) => {
@@ -230,10 +251,10 @@ export async function startHost(): Promise<boolean> {
     await new Promise<void>((resolve) => setTimeout(resolve, 800));
 
     // Ensure sunshine config sets host name to spacedesk - [hostname]
-    const confPath = ensureSunshineConfig(exePath);
+    ensureSunshineConfig(exePath);
 
-    // 3. Spawn SpaceviwerStream with config file and --host flag
-    hostProcess = spawn(exePath, [confPath, '--host'], {
+    // 3. Spawn SpaceviwerStream with native --host flag
+    hostProcess = spawn(exePath, ['--host'], {
       cwd: path.dirname(exePath),
       detached: false,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -265,8 +286,8 @@ export async function startHost(): Promise<boolean> {
     }
 
     // 5. Wait for the host HTTP loopback server to be ready
-    for (let attempt = 0; attempt < 10; attempt++) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    for (let attempt = 0; attempt < 15; attempt++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 250));
       const res = await loopbackRequest('GET', '/api/status');
       if (res.status === 200) {
         console.log('[GameStreamHost] Host is up and responsive on port 47990');
@@ -290,7 +311,8 @@ export async function startHost(): Promise<boolean> {
       }
     }
 
-    return true;
+    const finalStatus = await checkHostStatus();
+    return finalStatus === 'running';
   } catch (err) {
     console.error('[GameStreamHost] Failed to start:', err);
     return false;
@@ -833,48 +855,55 @@ export async function pairMoonlightPin(
 }
 
 export async function getMoonlightClients(): Promise<MoonlightClient[]> {
-  const clientsDir = getClientsDirectory();
-  if (!fs.existsSync(clientsDir)) return [];
+  const dirs = getAllClientDirectories();
+  const seen = new Set<string>();
+  const clients: MoonlightClient[] = [];
 
-  try {
-    const files = fs.readdirSync(clientsDir);
-    return files
-      .filter((f) => f.endsWith('.pem'))
-      .map((f) => {
-        const uuid = path.basename(f, '.pem');
-        return {
-          uuid,
-          name: `Moonlight Client (${uuid.slice(0, 8)})`,
-          enabled: true,
-        };
-      });
-  } catch {
-    return [];
+  for (const d of dirs) {
+    if (!fs.existsSync(d)) continue;
+    try {
+      const files = fs.readdirSync(d);
+      for (const f of files) {
+        if (f.endsWith('.pem') && !seen.has(f)) {
+          seen.add(f);
+          const uuid = path.basename(f, '.pem');
+          clients.push({
+            uuid,
+            name: `Moonlight Client (${uuid.slice(0, 8)})`,
+            enabled: true,
+          });
+        }
+      }
+    } catch {}
   }
+
+  return clients;
 }
 
 export async function removeMoonlightClient(
   uuid: string
 ): Promise<{ success: boolean; error?: string }> {
-  const clientsDir = getClientsDirectory();
-  const target = path.join(clientsDir, `${uuid}.pem`);
+  const dirs = getAllClientDirectories();
+  let removed = false;
 
-  try {
-    if (fs.existsSync(target)) {
-      fs.unlinkSync(target);
-      return { success: true };
-    }
-    // Try matching any file starting with uuid
-    const files = fs.readdirSync(clientsDir);
-    const matched = files.find((f) => f.includes(uuid));
-    if (matched) {
-      fs.unlinkSync(path.join(clientsDir, matched));
-      return { success: true };
-    }
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Erro ao remover cliente.' };
+  for (const clientsDir of dirs) {
+    if (!fs.existsSync(clientsDir)) continue;
+    try {
+      const target = path.join(clientsDir, `${uuid}.pem`);
+      if (fs.existsSync(target)) {
+        fs.unlinkSync(target);
+        removed = true;
+      }
+      const files = fs.readdirSync(clientsDir);
+      const matched = files.find((f) => f.includes(uuid));
+      if (matched) {
+        fs.unlinkSync(path.join(clientsDir, matched));
+        removed = true;
+      }
+    } catch {}
   }
+
+  return { success: true };
 }
 
 // ============================================================

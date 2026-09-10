@@ -218,6 +218,11 @@ export const MoonlightPanel: React.FC = () => {
   // --- Active Tab ---
   const [activeSection, setActiveSection] = useState<'tvs' | 'display' | 'pairing' | 'guides'>('tvs');
 
+  // --- Host Info (Hostname & IP) ---
+  const [hostInfo, setHostInfo] = useState<{ hostname: string; rawHostname: string; ip: string } | null>(null);
+  const autoStartAttemptedRef = useRef(false);
+  const userManuallyStoppedRef = useRef(false);
+
   const statsUnsubRef = useRef<(() => void) | null>(null);
 
   // ---- Load Host Displays, Settings & Driver Status ----
@@ -248,6 +253,9 @@ export const MoonlightPanel: React.FC = () => {
     refreshHostData();
 
     window.screenflow.getNetworkAddresses().then((ips) => setLocalIps(ips || []));
+    window.screenflow.getHostInfo?.().then((info) => {
+      if (info) setHostInfo(info);
+    }).catch(() => {});
 
     // Listen for GameStream status changes
     const unsubStatus = window.screenflow.onGameStreamStatus((status) => {
@@ -301,6 +309,16 @@ export const MoonlightPanel: React.FC = () => {
     try {
       const status = await window.screenflow.checkSunshine();
       setHostStatus(status);
+      if (status === 'stopped' && !userManuallyStoppedRef.current && !autoStartAttemptedRef.current) {
+        autoStartAttemptedRef.current = true;
+        console.log('[MoonlightPanel] Host is stopped on launch, auto-starting Moonlight host...');
+        window.screenflow.startGameStream().then((started) => {
+          if (started) {
+            setHostStatus('running');
+            refreshHostData();
+          }
+        }).catch(() => {});
+      }
     } catch {
       setHostStatus('stopped');
     }
@@ -333,10 +351,12 @@ export const MoonlightPanel: React.FC = () => {
     setIsToggling(true);
     try {
       if (hostStatus === 'running') {
+        userManuallyStoppedRef.current = true;
         await window.screenflow.stopGameStream();
         setHostStatus('stopped');
         setStreamStats(null);
       } else {
+        userManuallyStoppedRef.current = false;
         const success = await window.screenflow.startGameStream();
         if (success) {
           setHostStatus('running');
@@ -780,15 +800,20 @@ export const MoonlightPanel: React.FC = () => {
             )}
 
             {/* Host info box */}
-            <div className="p-3 bg-neutral-50 border border-neutral-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono">
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="font-bold text-neutral-800">IP deste PC para o Moonlight na TV:</span>
-                <span className="font-mono font-black text-neutral-900 bg-white px-2 py-0.5 rounded border border-neutral-250">
-                  {localIps[0] || '192.168.x.x'}
+            <div className="p-3 bg-neutral-50 border border-neutral-200/80 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs font-mono">
+              <div className="flex items-center flex-wrap gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <span className="font-bold text-neutral-800">Nome no Moonlight:</span>
+                <span className="font-mono font-black text-neutral-900 bg-white px-2 py-0.5 rounded border border-neutral-250 shadow-2xs">
+                  {hostInfo?.hostname || 'Buscando host...'}
+                </span>
+                <span className="text-neutral-400">·</span>
+                <span className="font-bold text-neutral-800">IP deste PC:</span>
+                <span className="font-mono font-black text-neutral-900 bg-white px-2 py-0.5 rounded border border-neutral-250 shadow-2xs">
+                  {hostInfo?.ip || localIps[0] || '127.0.0.1'}
                 </span>
               </div>
-              <span className="text-[10px] text-neutral-500">Host Nativo SpaceviwerStream · Portas: 47989 / 47984 / 48010</span>
+              <span className="text-[10px] text-neutral-500 shrink-0">Host Nativo SpaceviwerStream · Portas: 47989 / 47984 / 48010</span>
             </div>
           </GlassCard>
         </div>

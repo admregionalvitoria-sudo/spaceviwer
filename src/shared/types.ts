@@ -317,6 +317,7 @@ export interface ScreenFlowAPI {
   startGameStream: () => Promise<boolean>;
   stopGameStream: () => Promise<void>;
   getGameStreamStatus: () => Promise<GameStreamStatus>;
+  getHostInfo: () => Promise<{ hostname: string; rawHostname: string; ip: string }>;
   pairMoonlightPin: (pin: string) => Promise<{ success: boolean; error?: string }>;
 
   // Extended Virtual Display & Native Host Controls

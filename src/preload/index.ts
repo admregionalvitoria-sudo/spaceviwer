@@ -46,6 +46,7 @@ const api: ScreenFlowAPI = {
   startGameStream: () => ipcRenderer.invoke('start-gamestream'),
   stopGameStream: () => ipcRenderer.invoke('stop-gamestream'),
   getGameStreamStatus: () => ipcRenderer.invoke('get-gamestream-status'),
+  getHostInfo: () => ipcRenderer.invoke('get-host-info'),
   pairMoonlightPin: (pin) => ipcRenderer.invoke('pair-moonlight-pin', pin),
 
   // === EXTENDED VIRTUAL DISPLAY & HOST CONTROLS ===

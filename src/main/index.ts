@@ -16,7 +16,7 @@ import { readInstallMode, saveInstallMode } from './installer';
 import { SignalingServer } from './signaling';
 import { NetworkDiscovery } from './discovery';
 import { setupTray, destroyTray } from './tray';
-import { ensurePrivateNetworkProfile } from './network-utils';
+import { ensurePrivateNetworkProfile, getCleanMdnsHostname, getPrimaryLANIPv4 } from './network-utils';
 import { getAvailableScreens, getScreensDetailed, getAppWindows } from './capture';
 import {
   startAppProjector,
@@ -252,11 +252,12 @@ async function createWindow() {
     },
   });
 
-  // Initialize GameStream (Native SpaceviwerStream Host) if in Master mode
-  if (installMode === 'master' || installMode === 'both') {
+  // Initialize GameStream (Native SpaceviwerStream Host) automatically on startup
+  if (installMode === 'master' || installMode === 'both' || !installMode) {
     startHost().then((success) => {
-      if (success && mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('gamestream-status-changed', 'running');
+      console.log(`[Main] Native GameStream host auto-start result: ${success ? 'RUNNING' : 'FAILED'}`);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('gamestream-status-changed', success ? 'running' : 'stopped');
       }
     }).catch(console.error);
 
@@ -477,6 +478,14 @@ function registerIpcHandlers() {
   ipcMain.handle('get-gamestream-status', async () => {
     const status = await checkHostStatus();
     return status === 'running' ? 'running' : 'stopped';
+  });
+
+  ipcMain.handle('get-host-info', () => {
+    return {
+      hostname: getCleanMdnsHostname(),
+      rawHostname: os.hostname(),
+      ip: getPrimaryLANIPv4(),
+    };
   });
 
   // Extended Virtual Display & Native Controls

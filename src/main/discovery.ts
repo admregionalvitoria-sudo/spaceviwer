@@ -54,10 +54,12 @@ export class NetworkDiscovery extends EventEmitter {
       const cleanHost = getCleanMdnsHostname();
       const hostFqdn = `${cleanHost}.local`;
 
-      // moonlight names: spacedesk - [hostname] as requested by user, plus fallback aliases
-      const primarySpacedeskName = `spacedesk - ${cleanHost}`;
-      const secondarySpacedeskName = `spacedesk-${cleanHost}`;
+      // Moonlight target names:
+      // 1. cleanHost: Exact computer hostname for direct host discovery by Moonlight
+      // 2. SpaceViewer - [hostname]
+      // 3. spacedesk - [hostname] (for compatibility)
       const spaceViewerName = `SpaceViewer - ${cleanHost}`;
+      const primarySpacedeskName = `spacedesk - ${cleanHost}`;
 
       const nvTxt = {
         version: '7.1.431.0',
@@ -65,80 +67,79 @@ export class NetworkDiscovery extends EventEmitter {
         os: process.platform,
       };
 
-      // 1. SpaceViewer Master discovery service
+      // 1. SpaceViewer Master discovery service (WebRTC / screen mirroring)
       const s1 = b.publish({
         name: `SpaceViewer-${name}`,
         type: MDNS_SERVICE_TYPE,
         port,
         host: hostFqdn,
+        probe: false,
         txt: {
           version: APP_VERSION,
           os: process.platform,
           capabilities: 'video,audio',
         },
-      }) as unknown as Service;
+      } as any) as unknown as Service;
       this.publishedServices.push(s1);
 
-      // 2. Moonlight GameStream primary service: spacedesk - [hostname] (_nvstream._tcp on port 47989)
+      // 2. Moonlight GameStream primary: Computer Hostname directly (_nvstream._tcp on port 47989)
       const s2 = b.publish({
-        name: primarySpacedeskName,
-        type: 'nvstream',
-        port: 47989,
-        host: hostFqdn,
-        txt: nvTxt,
-      }) as unknown as Service;
-      this.publishedServices.push(s2);
-
-      // 3. Moonlight GameStream secondary format: spacedesk-[hostname]
-      const s3 = b.publish({
-        name: secondarySpacedeskName,
-        type: 'nvstream',
-        port: 47989,
-        host: hostFqdn,
-        txt: nvTxt,
-      }) as unknown as Service;
-      this.publishedServices.push(s3);
-
-      // 4. Moonlight GameStream debug channel (_nvstream_dbg._tcp on port 47989)
-      const s4 = b.publish({
-        name: primarySpacedeskName,
-        type: 'nvstream_dbg',
-        port: 47989,
-        host: hostFqdn,
-        txt: nvTxt,
-      }) as unknown as Service;
-      this.publishedServices.push(s4);
-
-      // 5. SpaceViewer fallback aliases
-      const s5 = b.publish({
-        name: spaceViewerName,
-        type: 'nvstream',
-        port: 47989,
-        host: hostFqdn,
-        txt: nvTxt,
-      }) as unknown as Service;
-      this.publishedServices.push(s5);
-
-      const s6 = b.publish({
         name: cleanHost,
         type: 'nvstream',
         port: 47989,
         host: hostFqdn,
+        probe: false,
         txt: nvTxt,
-      }) as unknown as Service;
-      this.publishedServices.push(s6);
+      } as any) as unknown as Service;
+      this.publishedServices.push(s2);
 
-      console.log(`[SpaceViewer] mDNS: Published GameStream Moonlight targets "${primarySpacedeskName}", "${spaceViewerName}", "${cleanHost}" on port 47989`);
+      // 3. Moonlight GameStream branded: SpaceViewer - [hostname]
+      const s3 = b.publish({
+        name: spaceViewerName,
+        type: 'nvstream',
+        port: 47989,
+        host: hostFqdn,
+        probe: false,
+        txt: nvTxt,
+      } as any) as unknown as Service;
+      this.publishedServices.push(s3);
 
-      // Periodic re-announcement every 10 seconds so Moonlight on the TV discovers the host promptly
+      // 4. Moonlight GameStream compatibility: spacedesk - [hostname]
+      const s4 = b.publish({
+        name: primarySpacedeskName,
+        type: 'nvstream',
+        port: 47989,
+        host: hostFqdn,
+        probe: false,
+        txt: nvTxt,
+      } as any) as unknown as Service;
+      this.publishedServices.push(s4);
+
+      // 5. Moonlight debug channel (_nvstream_dbg._tcp on port 47989)
+      const s5 = b.publish({
+        name: cleanHost,
+        type: 'nvstream_dbg',
+        port: 47989,
+        host: hostFqdn,
+        probe: false,
+        txt: nvTxt,
+      } as any) as unknown as Service;
+      this.publishedServices.push(s5);
+
+      console.log(`[SpaceViewer] mDNS: Published Moonlight host "${cleanHost}", "${spaceViewerName}", "${primarySpacedeskName}" on port 47989`);
+
+      // Periodic re-announcement every 10 seconds so Moonlight on TVs and clients discovers the host promptly
       if (this.reannounceTimer) {
         clearInterval(this.reannounceTimer);
       }
       this.reannounceTimer = setInterval(() => {
         try {
-          for (const s of this.publishedServices) {
-            if (s && typeof (s as any).publish === 'function') {
-              (s as any).publish();
+          const mdnsServer = (this.bonjour as any)?.server?.mdns;
+          if (mdnsServer && typeof mdnsServer.respond === 'function') {
+            for (const s of this.publishedServices) {
+              if (s && typeof (s as any).records === 'function') {
+                mdnsServer.respond((s as any).records());
+              }
             }
           }
         } catch {}
@@ -208,11 +209,12 @@ export class NetworkDiscovery extends EventEmitter {
         type: MDNS_AGENT_TYPE,
         port,
         host: hostFqdn,
+        probe: false,
         txt: {
           version: APP_VERSION,
           os: process.platform,
         },
-      }) as unknown as Service;
+      } as any) as unknown as Service;
       this.publishedServices.push(s);
       console.log(`[SpaceViewer] mDNS: Published agent "${name}" on port ${port}`);
     } catch (err) {

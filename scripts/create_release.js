@@ -46,8 +46,8 @@ async function main() {
   }, {
     tag_name: `v${VERSION}`,
     target_commitish: 'main',
-    name: `SpaceViewer v${VERSION} - Novo Card de Adição de Telas, Menu de Botão Direito e PnP`,
-    body: `### Novidades da Versão ${VERSION}\n\n- **Card de Adicionar Tela Virtual**: Card dedicado no grid com botão '+' para criar novas telas virtuais diretamente entre os monitores.\n- **Menu de Contexto com Botão Direito**: Clique com o botão direito em cima de qualquer tela ou na área de monitores para adicionar ou remover telas virtuais rapidamente.\n- **Botão Direto de Remoção**: Cada tela virtual conta agora com botão 'Remover' no cabeçalho do card.\n- **Correção da Criação no Windows PnP**: Identificação automática de todas as instâncias do driver e reinício dinâmico para carregar a nova tela virtual imediatamente sem travar.\n\nInstalador executável em anexo.`,
+    name: `SpaceViewer v${VERSION} - Correção do Host Moonlight, Auto-Start e Descoberta por Hostname`,
+    body: `### Novidades da Versão ${VERSION}\n\n- **Inicialização Automática do Host Moonlight**: O servidor GameStream SpaceviwerStream agora inicia automaticamente ao abrir o aplicativo, mantendo o host no estado Ativo (Pronto) sem necessidade de clique manual.\n- **Descoberta no Moonlight pelo Hostname do Computador**: O computador agora é anunciado e descoberto diretamente pelo nome de host do PC na rede local via mDNS (Bonjour com probe: false para evitar cancelamento de eco no Windows).\n- **Correção no Spawn do Binário Nativo**: Resolvido o parâmetro de inicialização que causava encerramento imediato do processo SpaceviwerStream.exe (status Host Parado).\n- **Identidade SpaceViewer no /serverinfo**: O servidor responde com o hostname real do computador sob a identidade SpaceViewer, sem nenhuma referência a SenaiStream.\n- **Sincronização de Smart TVs Pareadas**: Certificados de clientes em %LOCALAPPDATA%\\SpaceViewer\\clients são sincronizados e preservados.\n\nInstalador executável em anexo.`,
     draft: false,
     prerelease: false
   });
