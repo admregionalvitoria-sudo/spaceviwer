@@ -1,3 +1,4 @@
+import { TVAssignments } from '../components/TVAssignments';
 // SpaceViewer v2.2.9
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GlassCard } from '../components/ui/GlassCard';
@@ -350,7 +351,7 @@ export const ScreensPanel: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto pt-6 pb-12 px-6 space-y-6 space-grid-bg relative select-none">
+    <div className="flex-1 h-full overflow-y-auto pt-6 pb-12 px-6 space-y-6 space-grid-bg relative select-none">
       {/* Toast Action Message */}
       {actionMessage && (
         <div className="fixed top-14 right-6 z-50 px-4 py-2.5 rounded-xl bg-neutral-900/95 text-white border border-neutral-700 shadow-2xl flex items-center space-x-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -359,6 +360,7 @@ export const ScreensPanel: React.FC = () => {
         </div>
       )}
 
+      <TVAssignments />
       {/* Top Header & Connected Screens Counter */}
       <GlassCard className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-2">

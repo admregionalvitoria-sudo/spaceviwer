@@ -1,3 +1,4 @@
+import { setProjectedApplicationAudio, setNativeSessionAudio, getNativeAudioStatus, installNativeAudio } from './gamestream-host';
 // SpaceViewer v2.2.9
 // ============================================================
 // ScreenFlow — Main Electron Entry Point
@@ -382,11 +383,15 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('start-app-projector', async (_, sourceId: string, appName: string, displayId: string) => {
-    return await startAppProjector(sourceId, appName, displayId);
+    const result = await startAppProjector(sourceId, appName, displayId);
+    if (result.success) await setProjectedApplicationAudio(sourceId, displayId);
+    return result;
   });
 
   ipcMain.handle('start-obs-projector', async (_, sourceId: string, appName: string, displayId: string) => {
-    return await startAppProjector(sourceId, appName, displayId);
+    const result = await startAppProjector(sourceId, appName, displayId);
+    if (result.success) await setProjectedApplicationAudio(sourceId, displayId);
+    return result;
   });
 
   ipcMain.handle('stop-app-projector', async (_, displayId?: string) => {
@@ -406,7 +411,9 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('move-window-to-screen', async (_, windowName: string, displayId: string, sourceId?: string) => {
-    return await moveWindowToScreen(windowName, displayId, sourceId);
+    const result = await moveWindowToScreen(windowName, displayId, sourceId);
+    if (result.success && sourceId) await setProjectedApplicationAudio(sourceId, displayId);
+    return result;
   });
 
   // Master
@@ -539,6 +546,9 @@ function registerIpcHandlers() {
     return await getHostDisplays();
   });
 
+  ipcMain.handle('set-native-session-audio', (_, address: string, sourceId: string) => setNativeSessionAudio(address, sourceId));
+  ipcMain.handle('get-native-audio-status', () => getNativeAudioStatus());
+  ipcMain.handle('install-native-audio', () => installNativeAudio());
   ipcMain.handle('get-native-sessions', () => getNativeSessions());
   ipcMain.handle('set-native-session-display', (_, address: string, display: number) => setNativeSessionDisplay(address, display));
   ipcMain.handle('get-host-settings', async () => {
@@ -781,8 +791,13 @@ function registerIpcHandlers() {
 }
 
 // App lifecycle
-app.on('before-quit', () => {
+let audioRestoredForQuit = false;
+app.on('before-quit', (event) => {
   isQuitting = true;
+  if (!audioRestoredForQuit) {
+    event.preventDefault();
+    stopHost().catch(console.error).finally(() => { audioRestoredForQuit = true; app.quit(); });
+  }
 });
 
 // Prevent multiple instances — second instance focuses existing window

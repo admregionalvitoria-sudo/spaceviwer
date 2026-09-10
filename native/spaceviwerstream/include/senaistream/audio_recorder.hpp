@@ -15,6 +15,8 @@ namespace senaistream {
    * @brief Configures a finite system-audio recording.
    */
   struct AudioRecordConfig {
+    bool isolate_process {false};  ///< Capture only the selected process tree; zero PID yields silence.
+    std::uint32_t process_id {};  ///< Included application process tree.
     std::uint32_t duration_seconds {10};  ///< Recording duration.
     std::uint32_t bitrate_bps {192'000};  ///< Target Opus bitrate.
     std::uint32_t frame_duration_ms {20};  ///< Opus frame duration in milliseconds.
@@ -55,13 +57,16 @@ namespace senaistream {
      *
      * @param config Capture and Opus encoding settings. Duration is a safety limit.
      * @param stop_requested Cooperative cancellation flag.
+     * @param restart_requested Optional request to reopen capture for a new process.
      * @param callback Consumer called synchronously for each encoded Opus packet.
      * @return Operation status.
      */
     [[nodiscard]] Status stream_opus(
       const AudioRecordConfig &config,
       const std::atomic_bool &stop_requested,
-      const EncodedPacketCallback &callback) const;
+      const EncodedPacketCallback &callback,
+      const std::atomic_bool *restart_requested = nullptr
+    ) const;
   };
 
 }  // namespace senaistream

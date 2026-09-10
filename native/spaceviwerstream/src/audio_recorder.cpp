@@ -27,6 +27,101 @@ namespace {
 
   using Microsoft::WRL::ComPtr;
 
+  /** @brief Win32 process-loopback activation payload (Windows build 20348+). */
+  struct ProcessActivation {
+    int activation_type {1};  ///< AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK.
+    DWORD process_id {};  ///< Included process tree root.
+    int mode {};  ///< PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE.
+  };
+
+  /** @brief Agile completion callback owning the asynchronous activation result. */
+  class ProcessAudioActivation final: public IActivateAudioInterfaceCompletionHandler, public IAgileObject {
+  public:
+    std::atomic<ULONG> references {1};  ///< COM lifetime, including asynchronous callbacks.
+    HANDLE ready {CreateEventW(nullptr, TRUE, FALSE, nullptr)};  ///< Completion event.
+    HRESULT result {E_PENDING};  ///< Activation result.
+    ComPtr<IAudioClient> client;  ///< Activated process loopback client.
+    ProcessActivation parameters;  ///< Payload remains alive through completion.
+
+    /** @brief Releases the completion handle. */
+    ~ProcessAudioActivation() {
+      if (ready) {
+        CloseHandle(ready);
+      }
+    }
+
+    /** @brief Exposes completion and agility interfaces. @param iid Interface. @param value Result. @return COM status. */
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **value) override {
+      if (!value) {
+        return E_POINTER;
+      }
+      *value = nullptr;
+      if (iid == __uuidof(IUnknown) || iid == __uuidof(IActivateAudioInterfaceCompletionHandler)) {
+        *value = static_cast<IActivateAudioInterfaceCompletionHandler *>(this);
+      } else if (iid == __uuidof(IAgileObject)) {
+        *value = static_cast<IAgileObject *>(this);
+      } else {
+        return E_NOINTERFACE;
+      }
+      AddRef();
+      return S_OK;
+    }
+
+    /** @brief Retains the callback. @return Reference count. */
+    ULONG STDMETHODCALLTYPE AddRef() override {
+      return ++references;
+    }
+
+    /** @brief Releases the callback. @return Remaining references. */
+    ULONG STDMETHODCALLTYPE Release() override {
+      const auto count = --references;
+      if (!count) {
+        delete this;
+      }
+      return count;
+    }
+
+    /** @brief Receives the process-audio interface. @param operation Async result. @return Callback status. */
+    HRESULT STDMETHODCALLTYPE ActivateCompleted(IActivateAudioInterfaceAsyncOperation *operation) override {
+      ComPtr<IUnknown> activated;
+      HRESULT activation_result = E_FAIL;
+      result = operation->GetActivateResult(&activation_result, &activated);
+      if (SUCCEEDED(result)) {
+        result = activation_result;
+      }
+      if (SUCCEEDED(result)) {
+        result = activated.As(&client);
+      }
+      SetEvent(ready);
+      return S_OK;
+    }
+  };
+
+  /** @brief Activates capture restricted to one application process tree.
+   * @param pid Selected process. @param client Receives client. @return HRESULT. */
+  HRESULT activate_process_audio(DWORD pid, ComPtr<IAudioClient> &client) {
+    ComPtr<ProcessAudioActivation> callback;
+    callback.Attach(new ProcessAudioActivation());
+    if (!callback->ready) {
+      return HRESULT_FROM_WIN32(GetLastError());
+    }
+    callback->parameters.process_id = pid;
+    PROPVARIANT parameters {};
+    parameters.vt = VT_BLOB;
+    parameters.blob.cbSize = sizeof(ProcessActivation);
+    parameters.blob.pBlobData = reinterpret_cast<BYTE *>(&callback->parameters);
+    ComPtr<IActivateAudioInterfaceAsyncOperation> operation;
+    auto result = ActivateAudioInterfaceAsync(L"VAD\\Process_Loopback", __uuidof(IAudioClient), &parameters, callback.Get(), &operation);
+    if (FAILED(result)) {
+      return result;
+    }
+    if (WaitForSingleObject(callback->ready, 5000) != WAIT_OBJECT_0) {
+      return HRESULT_FROM_WIN32(WAIT_TIMEOUT);
+    }
+    client = callback->client;
+    return callback->result;
+  }
+
   /**
    * @brief Owns COM initialization for the audio worker.
    */
@@ -253,7 +348,8 @@ namespace {
       return source;
     }
     const auto destination_frames = static_cast<std::size_t>(
-      std::llround(static_cast<double>(source_frames) * destination_rate / source_rate));
+      std::llround(static_cast<double>(source_frames) * destination_rate / source_rate)
+    );
     std::vector<float> destination(destination_frames * 2);
     const auto ratio = static_cast<double>(source_rate) / destination_rate;
     for (std::size_t frame = 0; frame < destination_frames; ++frame) {
@@ -443,8 +539,7 @@ namespace senaistream {
       return failure("GetMixFormat", result);
     }
     std::unique_ptr<WAVEFORMATEX, WaveFormatDeleter> format(raw_format);
-    if (format->nChannels == 0 || format->nSamplesPerSec == 0 || format->nBlockAlign == 0 ||
-        sample_format(*format) == SampleKind::unsupported) {
+    if (format->nChannels == 0 || format->nSamplesPerSec == 0 || format->nBlockAlign == 0 || sample_format(*format) == SampleKind::unsupported) {
       return Status::failure("the default playback endpoint uses an unsupported sample format");
     }
 
@@ -454,7 +549,8 @@ namespace senaistream {
       0,
       0,
       format.get(),
-      nullptr);
+      nullptr
+    );
     if (FAILED(result)) {
       return failure("IAudioClient::Initialize", result);
     }
@@ -521,6 +617,7 @@ namespace senaistream {
     if (raw_encoder == nullptr || opus_error != OPUS_OK) {
       return Status::failure("opus_encoder_create failed: " + std::string(opus_strerror(opus_error)));
     }
+
     struct EncoderDeleter {
       /**
        * @brief Releases an Opus encoder.
@@ -531,6 +628,7 @@ namespace senaistream {
         opus_encoder_destroy(encoder);
       }
     };
+
     std::unique_ptr<OpusEncoder, EncoderDeleter> encoder(raw_encoder);
     opus_error = opus_encoder_ctl(encoder.get(), OPUS_SET_BITRATE(static_cast<int>(config.bitrate_bps)));
     if (opus_error != OPUS_OK) {
@@ -554,7 +652,8 @@ namespace senaistream {
         samples.data() + frame * static_cast<std::size_t>(frame_samples) * 2,
         frame_samples,
         packet.data(),
-        static_cast<opus_int32>(packet.size()));
+        static_cast<opus_int32>(packet.size())
+      );
       if (encoded_size < 0) {
         return Status::failure("opus_encode_float failed: " + std::string(opus_strerror(encoded_size)));
       }
@@ -572,7 +671,9 @@ namespace senaistream {
   Status AudioRecorder::stream_opus(
     const AudioRecordConfig &config,
     const std::atomic_bool &stop_requested,
-    const EncodedPacketCallback &callback) const {
+    const EncodedPacketCallback &callback,
+    const std::atomic_bool *restart_requested
+  ) const {
     const auto validation_error = validate_audio_config(config);
     if (!validation_error.empty()) {
       return Status::failure(validation_error);
@@ -585,38 +686,51 @@ namespace senaistream {
     if (FAILED(com.result()) && com.result() != RPC_E_CHANGED_MODE) {
       return failure("CoInitializeEx", com.result());
     }
-    ComPtr<IMMDeviceEnumerator> enumerator;
-    auto result = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator));
-    if (FAILED(result)) {
-      return failure("MMDeviceEnumerator creation", result);
-    }
-    ComPtr<IMMDevice> device;
-    result = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
-    if (FAILED(result)) {
-      return failure("GetDefaultAudioEndpoint", result);
-    }
     ComPtr<IAudioClient> audio_client;
-    result = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &audio_client);
-    if (FAILED(result)) {
-      return failure("IAudioClient activation", result);
-    }
     WAVEFORMATEX *raw_format = nullptr;
-    result = audio_client->GetMixFormat(&raw_format);
-    if (FAILED(result)) {
-      return failure("GetMixFormat", result);
+    HRESULT result = S_OK;
+    if (config.isolate_process) {
+      result = activate_process_audio(config.process_id ? config.process_id : GetCurrentProcessId(), audio_client);
+      if (FAILED(result)) {
+        return failure("Process audio capture requires Windows build 20348 or newer", result);
+      }
+      raw_format = static_cast<WAVEFORMATEX *>(CoTaskMemAlloc(sizeof(WAVEFORMATEX)));
+      if (!raw_format) {
+        return failure("Allocating process audio format", E_OUTOFMEMORY);
+      }
+      *raw_format = WAVEFORMATEX {WAVE_FORMAT_PCM, 2, 48000, 192000, 4, 16, 0};
+    } else {
+      ComPtr<IMMDeviceEnumerator> enumerator;
+      result = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator));
+      if (FAILED(result)) {
+        return failure("MMDeviceEnumerator creation", result);
+      }
+      ComPtr<IMMDevice> device;
+      result = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+      if (FAILED(result)) {
+        return failure("GetDefaultAudioEndpoint", result);
+      }
+      result = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &audio_client);
+      if (FAILED(result)) {
+        return failure("IAudioClient activation", result);
+      }
+      result = audio_client->GetMixFormat(&raw_format);
+      if (FAILED(result)) {
+        return failure("GetMixFormat", result);
+      }
     }
     std::unique_ptr<WAVEFORMATEX, WaveFormatDeleter> format(raw_format);
-    if (format->nChannels == 0 || format->nSamplesPerSec == 0 || format->nBlockAlign == 0 ||
-        sample_format(*format) == SampleKind::unsupported) {
+    if (format->nChannels == 0 || format->nSamplesPerSec == 0 || format->nBlockAlign == 0 || sample_format(*format) == SampleKind::unsupported) {
       return Status::failure("the default playback endpoint uses an unsupported sample format");
     }
     result = audio_client->Initialize(
       AUDCLNT_SHAREMODE_SHARED,
-      AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+      AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
       0,
       0,
       format.get(),
-      nullptr);
+      nullptr
+    );
     if (FAILED(result)) {
       return failure("IAudioClient::Initialize", result);
     }
@@ -639,6 +753,7 @@ namespace senaistream {
     if (raw_encoder == nullptr || opus_error != OPUS_OK) {
       return Status::failure("opus_encoder_create failed: " + std::string(opus_strerror(opus_error)));
     }
+
     struct LiveEncoderDeleter {
       /**
        * @brief Releases a live Opus encoder.
@@ -649,6 +764,7 @@ namespace senaistream {
         opus_encoder_destroy(encoder);
       }
     };
+
     std::unique_ptr<OpusEncoder, LiveEncoderDeleter> encoder(raw_encoder);
     opus_error = opus_encoder_ctl(encoder.get(), OPUS_SET_BITRATE(static_cast<int>(config.bitrate_bps)));
     if (opus_error == OPUS_OK) {
@@ -674,12 +790,16 @@ namespace senaistream {
     std::vector<std::uint8_t> encoded(4'000);
     std::uint32_t timestamp = 0;
     bool continue_stream = true;
-    while (std::chrono::steady_clock::now() < end_time && !stop_requested.load() && continue_stream) {
+    const auto interrupted = [&] {
+      return stop_requested.load() || (restart_requested && restart_requested->load());
+    };
+    while (std::chrono::steady_clock::now() < end_time && !interrupted() && continue_stream) {
       const auto now = std::chrono::steady_clock::now();
       const auto wait_time = next_packet > now ?
                                std::min<std::chrono::milliseconds>(
                                  std::chrono::duration_cast<std::chrono::milliseconds>(next_packet - now),
-                                 std::chrono::milliseconds(100)) :
+                                 std::chrono::milliseconds(100)
+                               ) :
                                std::chrono::milliseconds(0);
       WaitForSingleObject(event.get(), static_cast<DWORD>(wait_time.count()));
       for (;;) {
@@ -704,7 +824,8 @@ namespace senaistream {
           (flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0 ? nullptr : data,
           packet_frames,
           *format,
-          source_packet);
+          source_packet
+        );
         result = capture_client->ReleaseBuffer(packet_frames);
         if (FAILED(result)) {
           audio_client->Stop();
@@ -715,19 +836,26 @@ namespace senaistream {
       }
 
       auto current_time = std::chrono::steady_clock::now();
-      while (current_time >= next_packet && continue_stream && !stop_requested.load()) {
+      while (current_time >= next_packet && continue_stream && !interrupted()) {
         std::vector<float> frame(frame_values, 0.0F);
         const auto available = std::min(frame_values, pending_samples.size());
         std::copy_n(pending_samples.begin(), available, frame.begin());
         pending_samples.erase(pending_samples.begin(), pending_samples.begin() + static_cast<std::ptrdiff_t>(available));
         const auto encoded_size = opus_encode_float(
-          encoder.get(), frame.data(), frame_samples, encoded.data(), static_cast<opus_int32>(encoded.size()));
+          encoder.get(),
+          frame.data(),
+          frame_samples,
+          encoded.data(),
+          static_cast<opus_int32>(encoded.size())
+        );
         if (encoded_size < 0) {
           audio_client->Stop();
           return Status::failure("opus_encode_float failed: " + std::string(opus_strerror(encoded_size)));
         }
         continue_stream = callback(
-          std::span<const std::uint8_t>(encoded.data(), static_cast<std::size_t>(encoded_size)), timestamp);
+          std::span<const std::uint8_t>(encoded.data(), static_cast<std::size_t>(encoded_size)),
+          timestamp
+        );
         timestamp += static_cast<std::uint32_t>(frame_samples);
         next_packet += packet_period;
         current_time = std::chrono::steady_clock::now();

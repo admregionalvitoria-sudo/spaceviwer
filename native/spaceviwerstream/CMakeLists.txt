@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(SpaceViewerStream VERSION 2.2.11 LANGUAGES C CXX)
+project(SpaceViewerStream VERSION 2.2.12 LANGUAGES C CXX)
 
 if(NOT WIN32)
   message(FATAL_ERROR "SenaiStream currently targets Windows only")
@@ -33,6 +33,7 @@ find_file(OPENSSL_SSL_STATIC_ARCHIVE NAMES libssl.a PATHS ${OPENSSL_LIBRARY_DIRS
 
 add_library(senaistream_core
   src/audio_recorder.cpp
+  src/audio_output.cpp
   src/display_catalog.cpp
   src/gamestream_host.cpp
   src/moonlight_audio_packetizer.cpp

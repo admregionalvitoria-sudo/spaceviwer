@@ -331,7 +331,10 @@ export interface ScreenFlowAPI {
   installVirtualDisplayDriver: () => Promise<{ success: boolean; error?: string; rebootRequired?: boolean }>;
   setDisplayMode: (mode: DisplayTopologyMode) => Promise<{ success: boolean; error?: string }>;
   getHostDisplays: () => Promise<HostDisplayInfo[]>;
-  getNativeSessions: () => Promise<{ address: string; display: number }[]>;
+  getNativeSessions: () => Promise<NativeSession[]>;
+  setNativeSessionAudio: (address: string, sourceId: string) => Promise<{ success: boolean; error?: string }>;
+  getNativeAudioStatus: () => Promise<NativeAudioStatus>;
+  installNativeAudio: () => Promise<{ success: boolean; error?: string }>;
   setNativeSessionDisplay: (address: string, display: number) => Promise<{ success: boolean; error?: string }>;
   getHostSettings: () => Promise<HostSettings>;
   setHostSettings: (settings: Partial<HostSettings>) => Promise<{ success: boolean; error?: string }>;
@@ -407,3 +410,14 @@ declare global {
 }
 
 
+
+export interface NativeSession {
+  address: string;
+  display: number;
+  displayKey: string;
+  audioPid: number;
+  audioWindow: string;
+  audioName: string;
+  audioError: string;
+}
+export interface NativeAudioStatus { installed: boolean; redirected: boolean; error: string }

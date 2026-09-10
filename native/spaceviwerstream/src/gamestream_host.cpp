@@ -2,6 +2,8 @@
 
 #include "management_page.hpp"
 #include "senaistream/audio_recorder.hpp"
+#include "senaistream/audio_output.hpp"
+#include "senaistream/session_routes.hpp"
 #include "senaistream/display_catalog.hpp"
 #include "senaistream/moonlight_audio_packetizer.hpp"
 #include "senaistream/moonlight_video_packetizer.hpp"
@@ -78,9 +80,10 @@ namespace {
     std::atomic_bool active {};  ///< Authenticated ENet connection established.
     std::atomic_uint64_t frames {};  ///< Actual emitted video frames.
     std::atomic_uint64_t bytes {};  ///< Actual emitted video payload bytes.
-    std::atomic_int selected_display {-1};  ///< Optional display override for this client.
+    std::atomic_bool restart_audio {};  ///< Optional display override for this client.
     std::atomic_uint32_t display {};  ///< Actual selected capture display.
     std::atomic_uint32_t width {}, height {};  ///< Actual encoded resolution.
+    std::string audio_error;  ///< Last process-audio capture error.
     std::string client_certificate;  ///< Authorized identity used for revocation and resume.
     ENetPeer *control_peer {};  ///< Accessed exclusively by the host event loop.
     std::thread video, audio;  ///< Independent producer threads.
@@ -1506,6 +1509,13 @@ namespace senaistream {
               << "Management panel: http://127.0.0.1:47990/\n";
     std::vector<std::future<void>> workers;
     SessionRegistry<RuntimeSession> sessions;
+    SessionRoutes routes;
+    AudioOutput audio_output;
+    std::atomic_bool virtual_audio_available {audio_output.available()};
+    std::atomic_bool audio_redirected {};
+    std::mutex audio_status_mutex;
+    std::string audio_error;
+    auto next_audio_check = std::chrono::steady_clock::now();
     const auto restart_capture = [&]() {
       for (const auto &[address, session] : sessions.snapshot()) {
         session->restart_video.store(true);
@@ -1526,6 +1536,28 @@ namespace senaistream {
     bool pairing_waiting = false;
 
     while (!stop_requested_.load()) {
+      if (std::chrono::steady_clock::now() >= next_audio_check) {
+        bool needs_audio = false;
+        for (const auto &[address, session] : sessions.snapshot()) {
+          const auto route = routes.get(address);
+          DWORD pid = 0;
+          const auto window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(route.audio_window));
+          if (IsWindow(window)) {
+            GetWindowThreadProcessId(window, &pid);
+          }
+          if (session->active.load() && !session->stop.load() && route.audio_pid && pid == route.audio_pid) {
+            needs_audio = true;
+          }
+        }
+        const auto audio_status = audio_output.update(needs_audio);
+        virtual_audio_available.store(audio_output.available());
+        audio_redirected.store(audio_output.active());
+        {
+          std::lock_guard lock(audio_status_mutex);
+          audio_error = audio_status.ok() ? "" : audio_status.message();
+        }
+        next_audio_check = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+      }
       std::erase_if(workers, [](auto &worker) {
         return worker.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
       });
@@ -1542,6 +1574,7 @@ namespace senaistream {
           if (session->audio.joinable()) {
             session->audio.join();
           }
+          routes.detach(address);
           sessions.erase(address, session);
         }
       }
@@ -1668,7 +1701,9 @@ namespace senaistream {
                &input_mutex,
                &input_viewport,
                &media_stop_requested,
-               &video_restart_requested]() mutable {
+               &video_restart_requested,
+               &routes,
+               address = peer_address(peer)]() mutable {
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
                 VideoPacketizerState packetizer_state;
                 const auto stream_clock_start = std::chrono::steady_clock::now();
@@ -1676,7 +1711,7 @@ namespace senaistream {
                   video_restart_requested.store(false);
                   const auto user_settings = settings_.current();
                   VideoRecordConfig config;
-                  config.display_index = session->selected_display.load() >= 0 ? static_cast<std::uint32_t>(session->selected_display.load()) : user_settings.display_index;
+
                   config.width = user_settings.width == 0 ? negotiated.width : user_settings.width;
                   config.height = user_settings.height == 0 ? negotiated.height : user_settings.height;
                   config.frames_per_second =
@@ -1688,31 +1723,19 @@ namespace senaistream {
 
                   std::string display_error;
                   auto displays = DisplayCatalog().enumerate(display_error);
-                  auto selected = std::find_if(displays.begin(), displays.end(), [&](const DisplayInfo &display) {
-                    return display.index == config.display_index;
-                  });
-                  if (selected == displays.end() && user_settings.prefer_virtual_display) {
-                    selected = std::find_if(displays.begin(), displays.end(), [](const DisplayInfo &d) {
-                      return d.virtual_display;
-                    });
+                  const auto selected = SessionRoutes::resolve(routes.get(address), displays);
+                  if (!selected) {
+                    // A removed assigned monitor must never expose the PC's primary desktop.
+                    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+                    continue;
                   }
-                  if (selected == displays.end()) {
-                    selected = std::find_if(displays.begin(), displays.end(), [](const DisplayInfo &display) {
-                      return display.primary;
-                    });
-                    if (selected != displays.end()) {
-                      config.display_index = selected->index;
-                    }
-                  }
-                  if (selected != displays.end()) {
-                    config.display_index = selected->index;
-                  }
+                  config.display_index = selected->index;
                   session->display.store(config.display_index);
                   session->width.store(config.width);
                   session->height.store(config.height);
                   {
                     std::scoped_lock lock(input_mutex);
-                    input_viewport = selected == displays.end() ?
+                    input_viewport = !selected ?
                                        InputViewport {} :
                                        InputViewport {
                                          selected->desktop_left,
@@ -1777,43 +1800,72 @@ namespace senaistream {
               negotiated = session_config;
             }
             audio_stream_thread = std::thread(
-              [session, audio_socket, audio_peer, audio_peer_size, negotiated, &media_stop_requested]() {
+              [session, audio_socket, audio_peer, audio_peer_size, negotiated, &media_stop_requested, &routes, &audio_redirected, address = peer_address(peer)]() {
                 AudioRecordConfig config;
                 config.duration_seconds = 86'400;
                 config.bitrate_bps = 192'000;
                 config.frame_duration_ms = negotiated.audio_frame_ms;
                 AudioPacketizerState packetizer_state;
                 bool announced_first_packet = false;
-                const auto status = AudioRecorder().stream_opus(
-                  config,
-                  media_stop_requested,
-                  [&](std::span<const std::uint8_t> opus, std::uint32_t timestamp_48khz) {
-                    std::optional<std::vector<std::uint8_t>> encrypted;
-                    if (negotiated.encrypt_audio) {
-                      encrypted = encrypt_audio_frame(
-                        opus,
-                        negotiated.key,
-                        negotiated.key_id,
-                        packetizer_state.sequence
-                      );
-                      if (!encrypted) {
+                std::uint32_t next_timestamp = 0;
+                while (!media_stop_requested.load()) {
+                  session->restart_audio.store(false);
+                  const auto route = routes.get(address);
+                  DWORD current_pid = 0;
+                  const HWND window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(route.audio_window));
+                  if (IsWindow(window)) {
+                    GetWindowThreadProcessId(window, &current_pid);
+                  }
+                  config.isolate_process = true;
+                  config.process_id = audio_redirected.load() && current_pid == route.audio_pid ? route.audio_pid : 0;
+                  const auto status = AudioRecorder().stream_opus(
+                    config,
+                    media_stop_requested,
+                    [&](std::span<const std::uint8_t> opus, std::uint32_t timestamp_48khz) {
+                      std::optional<std::vector<std::uint8_t>> encrypted;
+                      if (negotiated.encrypt_audio) {
+                        encrypted = encrypt_audio_frame(
+                          opus,
+                          negotiated.key,
+                          negotiated.key_id,
+                          packetizer_state.sequence
+                        );
+                        if (!encrypted) {
+                          return false;
+                        }
+                        opus = *encrypted;
+                      }
+                      static_cast<void>(timestamp_48khz);
+                      const auto packet = packetize_opus_frame(opus, next_timestamp, packetizer_state);
+                      next_timestamp += 48 * negotiated.audio_frame_ms;
+                      if (sendto(audio_socket, reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()), 0, reinterpret_cast<const sockaddr *>(&audio_peer), audio_peer_size) == SOCKET_ERROR) {
                         return false;
                       }
-                      opus = *encrypted;
+                      if (!announced_first_packet) {
+                        std::cout << "First live Opus packet sent\n";
+                        announced_first_packet = true;
+                      }
+                      DWORD owner = 0;
+                      if (IsWindow(window)) {
+                        GetWindowThreadProcessId(window, &owner);
+                      }
+                      if (owner != current_pid || (route.audio_pid && current_pid == route.audio_pid && !config.process_id && audio_redirected.load())) {
+                        session->restart_audio.store(true);
+                      }
+                      return !media_stop_requested.load() && !session->restart_audio.load();
+                    },
+                    &session->restart_audio
+                  );
+                  if (!status.ok() && !media_stop_requested.load()) {
+                    {
+                      std::lock_guard lock(session->mutex);
+                      session->audio_error = status.message();
                     }
-                    const auto packet = packetize_opus_frame(opus, timestamp_48khz, packetizer_state);
-                    if (sendto(audio_socket, reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()), 0, reinterpret_cast<const sockaddr *>(&audio_peer), audio_peer_size) == SOCKET_ERROR) {
-                      return false;
-                    }
-                    if (!announced_first_packet) {
-                      std::cout << "First live Opus packet sent\n";
-                      announced_first_packet = true;
-                    }
-                    return !media_stop_requested.load();
+                    std::cerr << "Live audio stream failed: " << status.message() << '\n';
                   }
-                );
-                if (!status.ok() && !media_stop_requested.load()) {
-                  std::cerr << "Live audio stream failed: " << status.message() << '\n';
+                  if (!media_stop_requested.load()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                  }
                 }
               }
             );
@@ -1840,7 +1892,7 @@ namespace senaistream {
         closesocket(accepted_socket);
         continue;
       }
-      workers.emplace_back(std::async(std::launch::async, [this, accepted_socket, secure, rtsp, management, context = tls_context.get(), remote_address = peer_address(accepted_address), &sessions, &active_clients, &restart_capture, &pin_mutex, &pin_ready, &submitted_pin, &pairing_waiting]() {
+      workers.emplace_back(std::async(std::launch::async, [this, accepted_socket, secure, rtsp, management, context = tls_context.get(), remote_address = peer_address(accepted_address), &sessions, &active_clients, &restart_capture, &pin_mutex, &pin_ready, &submitted_pin, &pairing_waiting, &routes, &virtual_audio_available, &audio_redirected, &audio_status_mutex, &audio_error]() {
         SocketHandle client(accepted_socket);
         const DWORD socket_timeout = 5000;
         setsockopt(client.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&socket_timeout), sizeof(socket_timeout));
@@ -1951,9 +2003,19 @@ namespace senaistream {
                 list << ',';
               }
               first = false;
-              const auto display = session->selected_display.load();
-              list << "{\"address\":\"" << address << "\",\"display\":"
-                   << (display >= 0 ? display : static_cast<int>(settings_.current().display_index)) << "}";
+              std::string display_error;
+              const auto displays = DisplayCatalog().enumerate(display_error);
+              const auto route = routes.get(address);
+              const auto display = SessionRoutes::resolve(route, displays);
+              std::string capture_error;
+              {
+                std::lock_guard lock(session->mutex);
+                capture_error = session->audio_error;
+              }
+              list << "{\"address\":\"" << address << "\",\"display\":" << (display ? static_cast<int>(display->index) : -1)
+                   << ",\"displayKey\":\"" << escape_json(route.display_key) << "\",\"audioPid\":" << route.audio_pid
+                   << ",\"audioWindow\":\"" << route.audio_window << "\",\"audioName\":\"" << escape_json(route.audio_name)
+                   << "\",\"audioError\":\"" << escape_json(capture_error) << "\"}";
             }
             list << "]}";
             response = http_response("200 OK", "application/json", list.str());
@@ -1968,10 +2030,50 @@ namespace senaistream {
                 })) {
               response = http_response("400 Bad Request", "text/plain", "Cliente ou monitor indisponivel.");
             } else {
-              session->selected_display.store(static_cast<int>(display));
+              routes.select(std::string(query_value(form, "address")), SessionRoutes::key(displays, display));
+              session->restart_audio.store(true);
               session->restart_video.store(true);
               response = http_response("200 OK", "text/plain", "Tela da TV atualizada.");
             }
+          } else if (target == "/api/audio-status" && !post) {
+            std::lock_guard lock(audio_status_mutex);
+            response = http_response("200 OK", "application/json", std::string("{\"installed\":") + (virtual_audio_available.load() ? "true" : "false") + ",\"redirected\":" + (audio_redirected.load() ? "true" : "false") + ",\"error\":\"" + escape_json(audio_error) + "\"}");
+          } else if (target == "/api/session-audio" && post) {
+            const auto form = "/?" + std::string(http_body(request));
+            const auto address = std::string(query_value(form, "address"));
+            const auto session = sessions.find(address);
+            const auto handle_text = query_value(form, "window");
+            std::uint64_t handle = 0;
+            const auto parsed = std::from_chars(handle_text.data(), handle_text.data() + handle_text.size(), handle);
+            const auto window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(handle));
+            DWORD pid = 0;
+            if (IsWindow(window)) {
+              GetWindowThreadProcessId(window, &pid);
+            }
+            if (!session || session->stop.load() || parsed.ec != std::errc {} || parsed.ptr != handle_text.data() + handle_text.size() || (handle && !pid)) {
+              response = http_response("400 Bad Request", "text/plain", "Aplicativo ou TV indisponivel.");
+            } else if (handle && !virtual_audio_available.load()) {
+              response = http_response("409 Conflict", "text/plain", "Instale o driver de audio virtual primeiro.");
+            } else {
+              wchar_t title[1024] {};
+              if (handle) {
+                GetWindowTextW(window, title, 1024);
+              }
+              char utf8[4096] {};
+              if (handle) {
+                WideCharToMultiByte(CP_UTF8, 0, title, -1, utf8, sizeof(utf8), nullptr, nullptr);
+              }
+              routes.audio(address, pid, handle, utf8);
+              {
+                std::lock_guard lock(session->mutex);
+                session->audio_error.clear();
+              }
+              session->restart_audio.store(true);
+              response = http_response("200 OK", "text/plain", "Audio do aplicativo atribuido a TV.");
+            }
+          } else if (target == "/api/shutdown" && post) {
+            stop_requested_.store(true);
+            response = http_response("200 OK", "text/plain", "Encerrando e restaurando audio.");
           } else if (target == "/api/clients" && !post) {
             std::ostringstream clients;
             clients << "{\"clients\":[";
@@ -2135,6 +2237,8 @@ namespace senaistream {
               status = "409 Conflict";
               body = "<?xml version=\"1.0\"?><root status_code=\"409\" status_message=\"Client already connected or four-client limit reached\"/>";
             } else {
+              std::string display_error;
+              routes.attach(remote_address, DisplayCatalog().enumerate(display_error), settings_.current().display_index);
               body = success_xml("<gamesession>1</gamesession><sessionUrl0>rtsp://" + identity_.local_address + ":" + std::to_string(identity_.http_port + 21) + "</sessionUrl0>");
             }
           }

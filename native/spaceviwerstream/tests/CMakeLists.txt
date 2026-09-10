@@ -2,7 +2,9 @@ add_executable(
   test_sunshine
   test_live_sessions.cpp
   test_session_registry.cpp
+  test_session_routes.cpp
   test_audio_config.cpp
+  test_process_audio.cpp
   test_gamestream_host.cpp
   test_management_page.cpp
   test_moonlight_audio_packetizer.cpp
@@ -19,3 +21,11 @@ endif()
 include(GoogleTest)
 gtest_discover_tests(test_sunshine)
 
+
+add_executable(test_audio_source audio_test_source.cpp)
+target_link_libraries(test_audio_source PRIVATE winmm)
+if(MINGW)
+  target_link_options(test_audio_source PRIVATE -static -static-libgcc -static-libstdc++)
+endif()
+add_dependencies(test_sunshine test_audio_source)
+target_include_directories(test_sunshine PRIVATE ${OPUS_INCLUDE_DIRS})

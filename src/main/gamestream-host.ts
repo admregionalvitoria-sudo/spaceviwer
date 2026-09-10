@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execFile, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -6,10 +6,11 @@ import * as http from 'http';
 import { app, screen } from 'electron';
 import { changeVirtualDisplays, getWindowsDisplayInventory, matchWindowsDisplay, invalidateDisplayInventory } from './windows-displays';
 import { runPowerShell, psLiteral } from './windows-powershell';
-import type { SunshineStatus, DisplayTopologyMode, HostDisplayInfo, HostSettings, VirtualDisplayState, VirtualDisplayStatus, MoonlightClient, SunshineStreamStats, SunshineConfig, ScreenSource } from '../shared/types';
+import type { NativeSession, NativeAudioStatus, SunshineStatus, DisplayTopologyMode, HostDisplayInfo, HostSettings, VirtualDisplayState, VirtualDisplayStatus, MoonlightClient, SunshineStreamStats, SunshineConfig, ScreenSource } from '../shared/types';
 
 let hostProcess: ChildProcess | null = null;
 let starting: Promise<boolean> | null = null;
+let stopping: Promise<void> | null = null;
 let pairingTimer: NodeJS.Timeout | null = null;
 let pairingWaiting = false;
 let operations: Promise<unknown> = Promise.resolve();
@@ -66,6 +67,7 @@ export async function checkHostStatus(): Promise<SunshineStatus> {
 export function startHost(): Promise<boolean> {
   if (starting) return starting;
   starting = (async () => {
+    if (stopping) await stopping;
     const status = await nativeStatus();
     if (status.status === 200) return true;
     if (status.status === 409) throw new Error(status.raw);
@@ -89,10 +91,22 @@ export function startHost(): Promise<boolean> {
   })().finally(() => { starting = null; });
   return starting;
 }
-export async function stopHost(): Promise<void> {
+export function stopHost(): Promise<void> {
+  if (stopping) return stopping;
+  stopping = (async () => {
   if (starting) await starting.catch(() => {});
+  const shutdown = await nativeRequest('POST', '/api/shutdown', {});
+  if (shutdown.status === 200) {
+    for (let i=0;i<30;i++) {
+      if ((await nativeStatus()).status !== 200) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
   if (hostProcess) { hostProcess.kill(); hostProcess = null; }
   await runPowerShell(`Get-CimInstance Win32_Process -Filter "Name='SpaceviwerStream.exe'" | Where-Object { $_.ExecutablePath -eq ${psLiteral(getSpaceviwerStreamExePath())} } | ForEach-Object { Stop-Process -Id $_.ProcessId -ErrorAction Stop }`);
+  await new Promise<void>((resolve, reject) => execFile(getSpaceviwerStreamExePath(), ['--restore-audio'], { windowsHide: true, timeout: 10000 }, error => error ? reject(error) : resolve()));
+  })().finally(() => { stopping = null; });
+  return stopping;
 }
 export async function restartHost() { await stopHost(); return startHost(); }
 export function isHostRunning() { return hostProcess !== null && !hostProcess.killed; }
@@ -191,5 +205,38 @@ export function stopPairingWatcher() { if (pairingTimer) clearInterval(pairingTi
 export async function getSunshineConfig(): Promise<SunshineConfig> { const s = await getHostSettings(); return { displayName: `SpaceViewer - ${os.hostname()}`, captureDisplayIndex: s.display, selectedSourceId: null, fps: s.fps, resolution: { width: s.width, height: s.height } }; }
 export async function setSunshineConfig(config: Partial<SunshineConfig>) { const updates: Partial<HostSettings> = {}; if (config.captureDisplayIndex !== undefined) updates.display = config.captureDisplayIndex; if (config.fps !== undefined) updates.fps = config.fps; if (config.resolution) { updates.width = config.resolution.width; updates.height = config.resolution.height; } return setHostSettings(updates); }
 
-export async function getNativeSessions(): Promise<{ address: string; display: number }[]> { const res = await nativeRequest('GET', '/api/sessions'); return res.status === 200 ? res.data?.sessions || [] : []; }
+export async function getNativeSessions(): Promise<NativeSession[]> { const res = await nativeRequest('GET', '/api/sessions'); return res.status === 200 ? res.data?.sessions || [] : []; }
 export async function setNativeSessionDisplay(address: string, display: number) { return result(await nativeRequest('POST', '/api/session-display', { address, display })); }
+
+export async function setNativeSessionAudio(address: string, sourceId: string) {
+  const match = /^window:(\d+):/.exec(sourceId);
+  if (sourceId !== 'none' && !match) return { success: false, error: 'Selecione uma janela de aplicativo válida.' };
+  return result(await nativeRequest('POST', '/api/session-audio', { address, window: match?.[1] || '0' }));
+}
+export async function getNativeAudioStatus(): Promise<NativeAudioStatus> {
+  const response = await nativeRequest('GET', '/api/audio-status');
+  return response.status === 200 ? response.data : { installed: false, redirected: false, error: response.raw || 'Host indisponível.' };
+}
+export async function installNativeAudio() {
+  try {
+    await runPowerShell(`& ${psLiteral(resourceFile('install-audio.ps1'))}\nexit $LASTEXITCODE`, true);
+    for (let i=0;i<10;i++) {
+      if ((await getNativeAudioStatus()).installed) return { success: true };
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    return { success: false, error: 'O driver foi instalado, mas o host ainda não encontrou a saída virtual. Reinicie o host.' };
+  } catch (error) { return { success: false, error: (error as Error).message }; }
+}
+
+/** Associates a projected window with the TV using that exact monitor. */
+export async function setProjectedApplicationAudio(sourceId: string, displayId: string) {
+  const display = screen.getAllDisplays().find(item => String(item.id) === displayId);
+  if (!display) return;
+  const native = matchWindowsDisplay(display, (await getWindowsDisplayInventory()).displays);
+  const target = native && (await getHostDisplays()).find(item => item.deviceName.toLowerCase() === native.deviceName.toLowerCase());
+  if (!target || !(await getNativeAudioStatus()).installed) return;
+  for (const session of await getNativeSessions()) if (session.display === target.index) {
+    const changed = await setNativeSessionAudio(session.address, sourceId);
+    if (!changed.success) throw new Error(changed.error);
+  }
+}

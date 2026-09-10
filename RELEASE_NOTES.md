@@ -1,13 +1,15 @@
-## SpaceViewer 2.2.11
+## SpaceViewer 2.2.12
 
-- Servidor nativo integrado, compilado a partir do código-fonte incluído no projeto, sem dependência do Sunshine.
-- Sessões independentes para até quatro clientes Moonlight com IPs distintos na rede local; captura compartilhada quando usam o mesmo monitor.
-- Seleção de tela por TV conectada e atualização de captura sem encerrar a conexão de controle.
-- Correções na criação, redução e remoção das telas virtuais no Windows.
-- Projeção de aplicativos e inventário de monitores atualizados após mudanças de tela e de escala.
-- Remoção persistente de pareamentos e mensagens de erro baseadas no resultado real do Windows.
-- Instalador preserva a quantidade de telas e desativa o serviço legado conhecido para liberar as portas.
+- Distribuição automática de telas virtuais diferentes por conexão Moonlight, com escolha manual por TV.
+- Painel de atribuição também na aba Telas; botão para preparar telas estendidas e distribuir conexões existentes.
+- Áudio por aplicativo/processo, independente para cada TV. Sem aplicativo selecionado, a TV recebe silêncio.
+- Projeções vinculam o áudio do aplicativo à TV conectada àquela tela, quando a saída virtual está instalada.
+- Saída VB-CABLE opcional, instalada diretamente do fornecedor, para ouvir nas TVs sem reproduzir na saída padrão do PC.
+- Restauração da saída local ao encerrar a transmissão e recuperação após interrupções.
+- Monitor virtual removido não provoca transmissão automática do monitor principal.
 
-Validação: 29 testes nativos, 8 testes de integração, dois clientes de protocolo recebendo vídeo H.264 e ciclo real de telas virtuais 2 → 1 → 0 no Windows. Imagem e áudio nas TVs físicas ainda precisam ser confirmados. Pareamentos antigos podem precisar ser refeitos.
+Uso: prepare as telas, conecte as TVs, escolha a tela de cada conexão e o aplicativo em Áudio exclusivo desta TV. Duas abas/janelas do mesmo processo compartilham áudio; use aplicativos ou instâncias independentes. A captura por processo requer Windows build 20348+ (Windows 11).
 
-Atualização: use a verificação de atualizações do aplicativo ou execute o instalador anexado. O Windows solicita permissão de administrador para instalar.
+VB-CABLE é donationware da VB-Audio; o uso profissional requer licença do fornecedor. O download é feito pelo botão no app, sem compra automática: https://vb-audio.com/Services/licensing.htm . Aplicativos fixados manualmente em uma saída física devem usar a saída padrão do Windows.
+
+Validação: 33 testes nativos e 11 testes de integração, incluindo dois monitores virtuais reais, vídeo simultâneo, dois tons isolados por processo e restauração do áudio local. Reprodução física nas TVs ainda depende da confirmação do usuário.

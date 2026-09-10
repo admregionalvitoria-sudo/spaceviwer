@@ -17,9 +17,13 @@
 
 namespace {
 
-  constexpr GUID display_class_guid {
-    0x4D36E968, 0xE325, 0x11CE, {0xBF, 0xC1, 0x08, 0x00, 0x2B, 0xE1, 0x03, 0x18}};
-  constexpr std::wstring_view virtual_hardware_id = L"ROOT\\MTTVDD";
+  GUID display_class_guid {
+    0x4D36E968,
+    0xE325,
+    0x11CE,
+    {0xBF, 0xC1, 0x08, 0x00, 0x2B, 0xE1, 0x03, 0x18}
+  };
+  std::wstring_view virtual_hardware_id = L"ROOT\\MTTVDD";
 
   /**
    * @brief Closes a SetupAPI device-information set.
@@ -31,7 +35,8 @@ namespace {
      *
      * @param value SetupAPI handle.
      */
-    explicit DeviceSet(HDEVINFO value): value_(value) {
+    explicit DeviceSet(HDEVINFO value):
+        value_(value) {
     }
 
     /** @brief Releases the device-information set. */
@@ -90,7 +95,8 @@ namespace {
   std::optional<std::vector<std::uint8_t>> device_property(
     HDEVINFO set,
     SP_DEVINFO_DATA &device,
-    DWORD property) {
+    DWORD property
+  ) {
     DWORD required = 0;
     SetupDiGetDeviceRegistryPropertyW(set, &device, property, nullptr, nullptr, 0, &required);
     if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || required == 0) {
@@ -98,7 +104,14 @@ namespace {
     }
     std::vector<std::uint8_t> bytes(required);
     if (!SetupDiGetDeviceRegistryPropertyW(
-          set, &device, property, nullptr, bytes.data(), static_cast<DWORD>(bytes.size()), nullptr)) {
+          set,
+          &device,
+          property,
+          nullptr,
+          bytes.data(),
+          static_cast<DWORD>(bytes.size()),
+          nullptr
+        )) {
       return std::nullopt;
     }
     return bytes;
@@ -132,7 +145,12 @@ namespace {
    */
   bool apply_extended_topology() {
     const auto result = SetDisplayConfig(
-      0, nullptr, 0, nullptr, SDC_APPLY | SDC_TOPOLOGY_EXTEND | SDC_ALLOW_CHANGES | SDC_SAVE_TO_DATABASE);
+      0,
+      nullptr,
+      0,
+      nullptr,
+      SDC_APPLY | SDC_TOPOLOGY_EXTEND | SDC_ALLOW_CHANGES | SDC_SAVE_TO_DATABASE
+    );
     if (result == ERROR_SUCCESS) {
       return true;
     }
@@ -155,7 +173,8 @@ namespace {
           nullptr,
           nullptr,
           &startup,
-          &process)) {
+          &process
+        )) {
       return false;
     }
     WaitForSingleObject(process.hProcess, 10'000);
@@ -173,7 +192,12 @@ namespace {
    */
   bool apply_duplicated_topology() {
     const auto result = SetDisplayConfig(
-      0, nullptr, 0, nullptr, SDC_APPLY | SDC_TOPOLOGY_CLONE | SDC_ALLOW_CHANGES | SDC_SAVE_TO_DATABASE);
+      0,
+      nullptr,
+      0,
+      nullptr,
+      SDC_APPLY | SDC_TOPOLOGY_CLONE | SDC_ALLOW_CHANGES | SDC_SAVE_TO_DATABASE
+    );
     if (result == ERROR_SUCCESS) {
       return true;
     }
@@ -187,8 +211,17 @@ namespace {
     startup.cb = sizeof(startup);
     PROCESS_INFORMATION process {};
     if (!CreateProcessW(
-          executable.c_str(), command_line.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &startup,
-          &process)) {
+          executable.c_str(),
+          command_line.data(),
+          nullptr,
+          nullptr,
+          FALSE,
+          CREATE_NO_WINDOW,
+          nullptr,
+          nullptr,
+          &startup,
+          &process
+        )) {
       return false;
     }
     WaitForSingleObject(process.hProcess, 10'000);
@@ -212,7 +245,8 @@ namespace {
     const wchar_t *device_name,
     DWORD width,
     DWORD height,
-    DWORD refresh_rate) {
+    DWORD refresh_rate
+  ) {
     DEVMODEW mode {};
     mode.dmSize = sizeof(mode);
     if (!EnumDisplaySettingsW(device_name, ENUM_CURRENT_SETTINGS, &mode)) {
@@ -249,8 +283,7 @@ namespace {
       std::transform(label.begin(), label.end(), label.begin(), [](wchar_t value) {
         return static_cast<wchar_t>(std::towlower(value));
       });
-      if (label.find(L"virtual") != std::wstring::npos || label.find(L"vdd") != std::wstring::npos ||
-          label.find(L"mtt") != std::wstring::npos) {
+      if (label.find(L"virtual") != std::wstring::npos || label.find(L"vdd") != std::wstring::npos || label.find(L"mtt") != std::wstring::npos) {
         return display.DeviceName;
       }
     }
@@ -270,7 +303,9 @@ namespace {
     }
     DeviceSet existing(SetupDiGetClassDevsW(&display_class_guid, nullptr, nullptr, DIGCF_PRESENT));
     if (existing.get() != INVALID_HANDLE_VALUE && find_virtual_device(existing.get())) {
-      apply_extended_topology();
+      if (display_class_guid.Data1 != 0x4d36e96c) {
+        apply_extended_topology();
+      }
       return 0;
     }
 
@@ -282,25 +317,32 @@ namespace {
     SP_DEVINFO_DATA device {};
     device.cbSize = sizeof(device);
     if (!SetupDiCreateDeviceInfoW(
-          created.get(), L"SenaiStream Virtual Display", &display_class_guid, nullptr, nullptr, DICD_GENERATE_ID, &device)) {
+          created.get(),
+          display_class_guid.Data1 == 0x4d36e96c ? L"SpaceViewer Virtual Audio" : L"SenaiStream Virtual Display",
+          &display_class_guid,
+          nullptr,
+          nullptr,
+          DICD_GENERATE_ID,
+          &device
+        )) {
       std::wcerr << L"Unable to create the virtual display device: " << GetLastError() << L'\n';
       return 4;
     }
-    constexpr std::array<wchar_t, 14> identifiers {
-      L'R', L'o', L'o', L't', L'\\', L'M', L't', L't', L'V', L'D', L'D', L'\0', L'\0', L'\0'};
-    if (!SetupDiSetDeviceRegistryPropertyW(
-          created.get(),
-          &device,
-          SPDRP_HARDWAREID,
-          reinterpret_cast<const BYTE *>(identifiers.data()),
-          static_cast<DWORD>(identifiers.size() * sizeof(wchar_t))) ||
-        !SetupDiCallClassInstaller(DIF_REGISTERDEVICE, created.get(), &device)) {
+    std::wstring identifiers(virtual_hardware_id);
+    identifiers.push_back(L'\0');
+    identifiers.push_back(L'\0');
+    if (!SetupDiSetDeviceRegistryPropertyW(created.get(), &device, SPDRP_HARDWAREID, reinterpret_cast<const BYTE *>(identifiers.data()), static_cast<DWORD>(identifiers.size() * sizeof(wchar_t))) || !SetupDiCallClassInstaller(DIF_REGISTERDEVICE, created.get(), &device)) {
       std::wcerr << L"Unable to register the virtual display device: " << GetLastError() << L'\n';
       return 5;
     }
     BOOL reboot_required = FALSE;
     if (!UpdateDriverForPlugAndPlayDevicesW(
-          nullptr, virtual_hardware_id.data(), inf_path.c_str(), INSTALLFLAG_FORCE, &reboot_required)) {
+          nullptr,
+          virtual_hardware_id.data(),
+          inf_path.c_str(),
+          INSTALLFLAG_FORCE,
+          &reboot_required
+        )) {
       const auto error = GetLastError();
       SP_REMOVEDEVICE_PARAMS remove_parameters {};
       remove_parameters.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
@@ -310,13 +352,16 @@ namespace {
         created.get(),
         &device,
         &remove_parameters.ClassInstallHeader,
-        sizeof(remove_parameters));
+        sizeof(remove_parameters)
+      );
       SetupDiCallClassInstaller(DIF_REMOVE, created.get(), &device);
       std::wcerr << L"Unable to bind the signed virtual display driver: " << error << L'\n';
       return 6;
     }
     Sleep(1'500);
-    apply_extended_topology();
+    if (display_class_guid.Data1 != 0x4d36e96c) {
+      apply_extended_topology();
+    }
     return reboot_required ? 3010 : 0;
   }
 
@@ -344,17 +389,13 @@ namespace {
       reinterpret_cast<PBYTE>(published_inf.data()),
       static_cast<DWORD>(published_inf.size() * sizeof(wchar_t)),
       nullptr,
-      0);
+      0
+    );
     SP_REMOVEDEVICE_PARAMS remove_parameters {};
     remove_parameters.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
     remove_parameters.ClassInstallHeader.InstallFunction = DIF_REMOVE;
     remove_parameters.Scope = DI_REMOVEDEVICE_GLOBAL;
-    if (!SetupDiSetClassInstallParamsW(
-          set.get(),
-          &*device,
-          &remove_parameters.ClassInstallHeader,
-          sizeof(remove_parameters)) ||
-        !SetupDiCallClassInstaller(DIF_REMOVE, set.get(), &*device)) {
+    if (!SetupDiSetClassInstallParamsW(set.get(), &*device, &remove_parameters.ClassInstallHeader, sizeof(remove_parameters)) || !SetupDiCallClassInstaller(DIF_REMOVE, set.get(), &*device)) {
       std::wcerr << L"Unable to remove the virtual display device: " << GetLastError() << L'\n';
       return 7;
     }
@@ -380,6 +421,12 @@ int wmain(int argument_count, wchar_t **arguments) {
     return 1;
   }
   const std::wstring_view command(arguments[1]);
+  if (command == L"audio-ensure" && argument_count == 3) {
+    display_class_guid = GUID {0x4d36e96c, 0xe325, 0x11ce, {0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}};
+    virtual_hardware_id = L"VBAudioVACWDM";
+    return ensure_virtual_display(std::filesystem::absolute(arguments[2]));
+  }
+
   if (command == L"ensure" && argument_count == 3) {
     return ensure_virtual_display(std::filesystem::absolute(arguments[2]));
   }
@@ -404,7 +451,11 @@ int wmain(int argument_count, wchar_t **arguments) {
       return 9;
     }
     return apply_display_mode(
-             arguments[2], static_cast<DWORD>(width), static_cast<DWORD>(height), static_cast<DWORD>(refresh_rate)) ?
+             arguments[2],
+             static_cast<DWORD>(width),
+             static_cast<DWORD>(height),
+             static_cast<DWORD>(refresh_rate)
+           ) ?
              0 :
              10;
   }
@@ -417,8 +468,11 @@ int wmain(int argument_count, wchar_t **arguments) {
       return 9;
     }
     return apply_display_mode(
-             device->c_str(), static_cast<DWORD>(width), static_cast<DWORD>(height),
-             static_cast<DWORD>(refresh_rate)) ?
+             device->c_str(),
+             static_cast<DWORD>(width),
+             static_cast<DWORD>(height),
+             static_cast<DWORD>(refresh_rate)
+           ) ?
              0 :
              10;
   }

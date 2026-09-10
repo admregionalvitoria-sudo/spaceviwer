@@ -136,3 +136,22 @@ test('a different server on port 47990 is never accepted or sent settings', asyn
   await assert.rejects(api.startHost(), /SenaiStream/);
   assert.equal(calls.filter((c) => c.type === 'http' && c.method === 'POST').length, 0);
 });
+test('audio selection targets one TV and the exact window handle', async () => {
+  const { api, calls } = hostFixture();
+  assert.equal((await api.setNativeSessionAudio('10.0.0.22', 'window:123456:0')).success, true);
+  const mutation = calls.find(call => call.path === '/api/session-audio');
+  assert.equal(new URLSearchParams(mutation.body).get('address'), '10.0.0.22');
+  assert.equal(new URLSearchParams(mutation.body).get('window'), '123456');
+  assert.ok(!calls.some(call => call.path === '/api/settings'));
+});
+test('audio selection rejects a desktop source instead of capturing system audio', async () => {
+  const { api, calls } = hostFixture();
+  assert.equal((await api.setNativeSessionAudio('10.0.0.22', 'screen:0:0')).success, false);
+  assert.equal(calls.length, 0);
+});
+test('audio can be silenced independently for one TV', async () => {
+  const { api, calls } = hostFixture();
+  assert.equal((await api.setNativeSessionAudio('10.0.0.23', 'none')).success, true);
+  const mutation = calls.find(call => call.path === '/api/session-audio');
+  assert.equal(new URLSearchParams(mutation.body).get('window'), '0');
+});

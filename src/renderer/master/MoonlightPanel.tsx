@@ -1,3 +1,4 @@
+import { TVAssignments } from '../components/TVAssignments';
 // SpaceViewer v2.2.9
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GlassCard } from '../components/ui/GlassCard';
@@ -597,23 +598,7 @@ export const MoonlightPanel: React.FC = () => {
       </div>
 
       {hostError && <div role="alert" className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-sm">{hostError}</div>}
-      {nativeSessions.length > 0 && <GlassCard className="p-4 space-y-3">
-        <h3 className="text-sm font-bold">Tela enviada para cada TV</h3>
-        {nativeSessions.map((session) => <div key={session.address} className="flex items-center justify-between gap-3">
-          <span className="text-xs font-mono">{session.address}</span>
-          <select aria-label={`Tela enviada para ${session.address}`} value={session.display} disabled={updatingSession === session.address}
-            className="rounded-lg border border-neutral-300 px-3 py-2 text-xs bg-white"
-            onChange={async (event) => {
-              const display = Number(event.target.value); setUpdatingSession(session.address);
-              try { const result = await window.screenflow.setNativeSessionDisplay(session.address, display);
-                if (!result.success) throw new Error(result.error);
-                setNativeSessions(await window.screenflow.getNativeSessions());
-              } catch (error: any) { setHostError(error.message); } finally { setUpdatingSession(null); }
-            }}>
-            {displays.map((display) => <option key={display.index} value={display.index}>{display.name}{display.virtual ? ' (Virtual)' : ''}</option>)}
-          </select>
-        </div>)}
-      </GlassCard>}
+      <TVAssignments />
       {/* ── Virtual Display Driver Alert (if not installed) ── */}
       {!driverStatus.installed && (
         <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">

@@ -1,7 +1,7 @@
 # SpaceViewer
 
 > **Central de Transmissão, Extensão de Telas e Espelhamento de Alta Performance em Rede Local.**  
-> Versão Atual: **v2.2.11** · Licença: **MIT** · Plataforma Alvo: **Windows 10/11 (x64)**
+> Versão Atual: **v2.2.12** · Licença: **MIT** · Plataforma Alvo: **Windows 10/11 (x64)**
 
 ---
 
@@ -237,7 +237,7 @@ Para assegurar o nível de excelência visual, consistência tipográfica e acab
 
 ## Histórico de Atualizações (Changelog)
 
-### [v2.2.11] — 10 de Setembro de 2026
+### [v2.2.12] — 10 de Setembro de 2026
 - **Inicialização Automática do Host Moonlight**:
   - O servidor GameStream nativo `SpaceviwerStream.exe` agora é iniciado automaticamente no arranque do SpaceViewer sem depender de ação do usuário.
   - Implementada verificação automática com recuperação em segundo plano no carregamento do painel Moonlight.
@@ -365,3 +365,22 @@ SPACEVIEWER_TEST_CAPTURE=1 cmake-build-spaceviewer/tests/test_sunshine.exe --gte
 - O servidor integrado usa `%LOCALAPPDATA%\SpaceViewer` para configurações e certificados. Pareamentos de instalações anteriores podem precisar ser refeitos.
 
 Validação automatizada inclui TLS, RTSP, dois clientes ENet, vídeo H.264 por UDP, atualização de captura e cancelamento independente. Isso não substitui a confirmação visual/sonora com os modelos físicos de TV.
+
+
+## Telas e áudio independentes — 2.2.12
+
+Na aba **Telas** ou **Moonlight**, o painel **Uma tela e um aplicativo para cada TV** permite:
+
+1. Preparar duas telas virtuais estendidas (o botão também distribui as TVs já conectadas).
+2. Conectar cada TV no Moonlight. Novas conexões recebem telas virtuais livres quando disponíveis.
+3. Escolher **Tela desta TV**. O monitor principal continua disponível para o trabalho local.
+4. Usar **Transmitir aplicativo** na tela virtual correspondente. Se a TV já estiver conectada e o áudio virtual instalado, o áudio desse aplicativo é vinculado à TV.
+5. Ajustar **Áudio exclusivo desta TV** ou selecionar **Sem áudio**.
+
+A captura de áudio inclui apenas o processo selecionado e seus filhos, usando a API do Windows build 20348 ou posterior (Windows 11). Duas abas ou janelas que compartilham o mesmo processo não possuem áudio separável; use aplicativos/instâncias independentes. Aplicativos configurados explicitamente para uma saída física devem usar a saída padrão do Windows para não continuarem tocando localmente.
+
+O VB-CABLE é instalado pelo botão do painel, baixando e verificando o pacote original da VB-Audio. Ele não está incluído no instalador nem no código-fonte deste repositório. É donationware; uso profissional requer a licença do fornecedor: https://vb-audio.com/Services/licensing.htm . O botão pode pedir elevação e o fornecedor recomenda reiniciar após instalar. Nenhuma compra é realizada pelo SpaceViewer.
+
+Enquanto houver uma TV com aplicativo de áudio ativo, a saída padrão do Windows é direcionada ao dispositivo virtual. A saída anterior é restaurada ao terminar a última transmissão com áudio, encerrar o host ou reiniciar após uma interrupção. O áudio dos aplicativos não selecionados não é enviado às TVs. As escolhas de tela são mantidas durante a execução do host e reconexões; após reiniciar o host, a distribuição automática considera novamente as telas disponíveis.
+
+Validação adicional: duas capturas simultâneas em telas virtuais distintas; isolamento de dois processos reproduzindo tons diferentes, codificação/decodificação Opus e restauração da saída local; 33 testes nativos e 11 testes de integração. A reprodução física nas TVs ainda depende da validação do usuário.

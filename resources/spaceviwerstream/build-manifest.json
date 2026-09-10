@@ -1,7 +1,11 @@
 ﻿{
     "sources":  [
                     {
-                        "sha256":  "406FFD1880E198992633DF0B9F5468F73C17546A605A9D5BDC01C82AC67FA554",
+                        "sha256":  "19AB4DC427F6F07E2CB118C4DC69D600AEA905F2A001F69E0BE8B42A02D651C7",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\audio_output.hpp"
+                    },
+                    {
+                        "sha256":  "3052DD18D996D3AB7984E5C47587CF8DC64DA7307D207F87ADBF9ACCCFE51138",
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\audio_recorder.hpp"
                     },
                     {
@@ -29,6 +33,10 @@
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\session_registry.hpp"
                     },
                     {
+                        "sha256":  "60003448666125F8FA5AE3B7A7BE39D15A66484675CB986FCA57B7275AFC2B98",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\session_routes.hpp"
+                    },
+                    {
                         "sha256":  "F18A26D0F186F04CC13C88896821C6DF18F57EB470B97F52ACD83E52A90D57A4",
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\settings.hpp"
                     },
@@ -45,7 +53,11 @@
                         "path":  "native\\spaceviwerstream\\include\\senaistream\\video_types.hpp"
                     },
                     {
-                        "sha256":  "371E11D8535FEA2807F4C5F63A4588FF8E3CF3A61AE596D59E9EB635A959D5E5",
+                        "sha256":  "5BA0E737964BBE8DDB79ABB36FEA70EFEDDDC6750C4EADD4BE26938B6FDE9F3B",
+                        "path":  "native\\spaceviwerstream\\src\\audio_output.cpp"
+                    },
+                    {
+                        "sha256":  "31838F9E5C939A8F54C2A437CFC2CE98588F6F411A2E4FCDA40F7B043917F996",
                         "path":  "native\\spaceviwerstream\\src\\audio_recorder.cpp"
                     },
                     {
@@ -53,15 +65,15 @@
                         "path":  "native\\spaceviwerstream\\src\\display_catalog.cpp"
                     },
                     {
-                        "sha256":  "3854D85183482D4D58E805AEDCE72FCD99BDA5E5560D8E4A3A0ED4165397C1DA",
+                        "sha256":  "B48E1DC5D687978839086CF05FBB7E304AF8ABCF05137499E8EA93FC804C30D3",
                         "path":  "native\\spaceviwerstream\\src\\display_device_main.cpp"
                     },
                     {
-                        "sha256":  "7CD7B23DB5E78949B185E734CE8089FD69E150E4AA44D3D923F48A9D59A1C8E6",
+                        "sha256":  "B2E18A67FBBAD8EC20DFD926567E5917CBC79ADD4D369BE8241424D5B74FBCE1",
                         "path":  "native\\spaceviwerstream\\src\\gamestream_host.cpp"
                     },
                     {
-                        "sha256":  "0A9E1CC80864D54C9B307F7684CF2D923BBC87E3CC049C5A1722A65C6643A315",
+                        "sha256":  "4E41F21B8FF3F771AD650E00455E9A62FEF78203579D9EC7660E6EE6F39BC6A5",
                         "path":  "native\\spaceviwerstream\\src\\main.cpp"
                     },
                     {
@@ -103,14 +115,14 @@
                 ],
     "binaries":  [
                      {
-                         "sha256":  "7A02CC881DAA07278F5AAC3EAE9E707F90E3DAB11020B916056189DCC9FF592A",
+                         "sha256":  "E9A16315F9973230A82EBE3F13D84E888A524E56C3F10EA320E989FFD6321CC2",
                          "name":  "SpaceviwerStream.exe"
                      },
                      {
-                         "sha256":  "60C80B128342C46BAC8C9619322F4607ED7EE60EA85A19020373943D53452114",
+                         "sha256":  "B08F92C0D4B8403A3FCA8DF3C40FB4971C4DC71B9F3190B02D5520A4910F4887",
                          "name":  "SpaceviwerStreamDisplayCtl.exe"
                      }
                  ],
-    "version":  "2.2.11",
-    "builtAt":  "2026-09-10T17:48:43.4885509Z"
+    "version":  "2.2.12",
+    "builtAt":  "2026-09-10T18:31:29.2285801Z"
 }

@@ -1,4 +1,5 @@
 #include "senaistream/audio_recorder.hpp"
+#include "senaistream/audio_output.hpp"
 #include "senaistream/display_catalog.hpp"
 #include "senaistream/gamestream_host.hpp"
 #include "senaistream/video_recorder.hpp"
@@ -70,6 +71,10 @@ namespace {
  * @return Zero on success or a non-zero process exit code on failure.
  */
 int main(int argument_count, char **arguments) {
+  if (argument_count == 2 && std::string_view(arguments[1]) == "--restore-audio") {
+    senaistream::AudioOutput output;
+    return output.update(false).ok() ? 0 : 1;
+  }
   if (argument_count == 2 && std::string_view(arguments[1]) == "--list-displays") {
     senaistream::DisplayCatalog catalog;
     std::string error;
@@ -86,8 +91,7 @@ int main(int argument_count, char **arguments) {
     return 0;
   }
 
-  if (argument_count == 2 &&
-      (std::string_view(arguments[1]) == "--host" || std::string_view(arguments[1]) == "--dashboard")) {
+  if (argument_count == 2 && (std::string_view(arguments[1]) == "--host" || std::string_view(arguments[1]) == "--dashboard")) {
     const bool open_dashboard = std::string_view(arguments[1]) == "--dashboard";
     std::thread dashboard_opener;
     if (open_dashboard) {
@@ -108,8 +112,7 @@ int main(int argument_count, char **arguments) {
     return 0;
   }
 
-  if (argument_count < 3 ||
-      (std::string_view(arguments[1]) != "--record-video" && std::string_view(arguments[1]) != "--record-audio")) {
+  if (argument_count < 3 || (std::string_view(arguments[1]) != "--record-video" && std::string_view(arguments[1]) != "--record-audio")) {
     print_usage();
     return argument_count == 1 ? 0 : 1;
   }
@@ -140,53 +143,43 @@ int main(int argument_count, char **arguments) {
         return 1;
       }
       parsed = parse_u32(value, config.display_index);
-    }
-    else if (option == "--seconds") {
+    } else if (option == "--seconds") {
       parsed = audio_mode ? parse_u32(value, audio_config.duration_seconds) : parse_u32(value, config.duration_seconds);
-    }
-    else if (option == "--fps") {
+    } else if (option == "--fps") {
       if (audio_mode) {
         std::cerr << "Option --fps is only valid for video recording\n";
         return 1;
       }
       parsed = parse_u32(value, config.frames_per_second);
-    }
-    else if (option == "--bitrate") {
+    } else if (option == "--bitrate") {
       parsed = audio_mode ? parse_u32(value, audio_config.bitrate_bps) : parse_u32(value, config.bitrate_bps);
-    }
-    else if (option == "--width") {
+    } else if (option == "--width") {
       if (audio_mode) {
         std::cerr << "Option --width is only valid for video recording\n";
         return 1;
       }
       parsed = parse_u32(value, config.width);
-    }
-    else if (option == "--height") {
+    } else if (option == "--height") {
       if (audio_mode) {
         std::cerr << "Option --height is only valid for video recording\n";
         return 1;
       }
       parsed = parse_u32(value, config.height);
-    }
-    else if (option == "--frame-ms" && audio_mode) {
+    } else if (option == "--frame-ms" && audio_mode) {
       parsed = parse_u32(value, audio_config.frame_duration_ms);
-    }
-    else if (option == "--codec") {
+    } else if (option == "--codec") {
       if (audio_mode) {
         std::cerr << "Option --codec is only valid for video recording\n";
         return 1;
       }
       if (value == "h264") {
         config.codec = senaistream::VideoCodec::h264;
-      }
-      else if (value == "hevc") {
+      } else if (value == "hevc") {
         config.codec = senaistream::VideoCodec::hevc;
-      }
-      else {
+      } else {
         parsed = false;
       }
-    }
-    else {
+    } else {
       std::cerr << "Unknown option: " << option << '\n';
       return 1;
     }
