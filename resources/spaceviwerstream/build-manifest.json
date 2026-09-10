@@ -1,0 +1,116 @@
+﻿{
+    "sources":  [
+                    {
+                        "sha256":  "406FFD1880E198992633DF0B9F5468F73C17546A605A9D5BDC01C82AC67FA554",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\audio_recorder.hpp"
+                    },
+                    {
+                        "sha256":  "5A6AB693398C0E4432DB181155C073C4D28159E34D751715BE0E5AA252303243",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\display_catalog.hpp"
+                    },
+                    {
+                        "sha256":  "13194DD50A9492842E6B863B87C45CEE150852F3C974376D47C009E96E0DB8AB",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\gamestream_host.hpp"
+                    },
+                    {
+                        "sha256":  "FE4C3E74271BA5D30180EAB39A2763E87C0AC43BD409E395A1033F020969DEB2",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\moonlight_audio_packetizer.hpp"
+                    },
+                    {
+                        "sha256":  "5A73F273B98F516E310EF83336A90E495F942CBC09B9D8A285ECFF7D2BFEACC5",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\moonlight_video_packetizer.hpp"
+                    },
+                    {
+                        "sha256":  "DAF6AB57C0C4A06398A955DC76F40CDCDB3F7A58D0570496E060F035B7E888EC",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\pairing.hpp"
+                    },
+                    {
+                        "sha256":  "D59769D78E5A80F0585B3ADA31EE373205F27F0F41C55D35E0529177693625D7",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\session_registry.hpp"
+                    },
+                    {
+                        "sha256":  "F18A26D0F186F04CC13C88896821C6DF18F57EB470B97F52ACD83E52A90D57A4",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\settings.hpp"
+                    },
+                    {
+                        "sha256":  "33B7EA3FBB7387B2E788944A6B5CD9B8817EF092FA2BB575B422A73BCBAD46CE",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\status.hpp"
+                    },
+                    {
+                        "sha256":  "2234E53473368615E1679E2FEF0483A673562A88B71E53C10775BFA316A3A856",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\video_recorder.hpp"
+                    },
+                    {
+                        "sha256":  "D828F04B9444065810C6095731673FD8EA76614065D57198510D82A61674253F",
+                        "path":  "native\\spaceviwerstream\\include\\senaistream\\video_types.hpp"
+                    },
+                    {
+                        "sha256":  "371E11D8535FEA2807F4C5F63A4588FF8E3CF3A61AE596D59E9EB635A959D5E5",
+                        "path":  "native\\spaceviwerstream\\src\\audio_recorder.cpp"
+                    },
+                    {
+                        "sha256":  "F8D1F4D2CFF748F8142AB74D0FA5C1CAD768C044513DDF1584E481225AAF3CA7",
+                        "path":  "native\\spaceviwerstream\\src\\display_catalog.cpp"
+                    },
+                    {
+                        "sha256":  "3854D85183482D4D58E805AEDCE72FCD99BDA5E5560D8E4A3A0ED4165397C1DA",
+                        "path":  "native\\spaceviwerstream\\src\\display_device_main.cpp"
+                    },
+                    {
+                        "sha256":  "7CD7B23DB5E78949B185E734CE8089FD69E150E4AA44D3D923F48A9D59A1C8E6",
+                        "path":  "native\\spaceviwerstream\\src\\gamestream_host.cpp"
+                    },
+                    {
+                        "sha256":  "0A9E1CC80864D54C9B307F7684CF2D923BBC87E3CC049C5A1722A65C6643A315",
+                        "path":  "native\\spaceviwerstream\\src\\main.cpp"
+                    },
+                    {
+                        "sha256":  "F70E00A612182F1BA2F7FCA5333606BFF184B37062B7F87FD3E2724DED8647C6",
+                        "path":  "native\\spaceviwerstream\\src\\management_page.hpp"
+                    },
+                    {
+                        "sha256":  "52DB04EE851F7FE9F32C0C69EED2F65213FD6F62FC5E5180338F8AA1BB496E1D",
+                        "path":  "native\\spaceviwerstream\\src\\moonlight_audio_packetizer.cpp"
+                    },
+                    {
+                        "sha256":  "F3A4EA79B64B32A8314FFDC5F71EF6E16773ABA581D26A045907BB1372EB094A",
+                        "path":  "native\\spaceviwerstream\\src\\moonlight_video_packetizer.cpp"
+                    },
+                    {
+                        "sha256":  "E0C9CF3D4586FC2673633D84924C8748FD4395678A3855F554D14DB2F3BDC267",
+                        "path":  "native\\spaceviwerstream\\src\\pairing.cpp"
+                    },
+                    {
+                        "sha256":  "41D625EB0E3B5050F530C2B6F63995F71CF10DEDF6DE3CD5E6C46D291F979946",
+                        "path":  "native\\spaceviwerstream\\src\\service_main.cpp"
+                    },
+                    {
+                        "sha256":  "8078DDB59BB6A9B08CF1C67B3E4588D7618DFB0DCDD77B60DA4F54E562D09471",
+                        "path":  "native\\spaceviwerstream\\src\\settings.cpp"
+                    },
+                    {
+                        "sha256":  "37A04CE68B89BBBA70CDAE7AB55795C79E9080C19BC87B1C199016F5111BEC6E",
+                        "path":  "native\\spaceviwerstream\\src\\tray_main.cpp"
+                    },
+                    {
+                        "sha256":  "0F28671815DEE88C782A1344D97F65D3D8D139A67A99B0F980D42FB733B0C809",
+                        "path":  "native\\spaceviwerstream\\src\\ui_main.cpp"
+                    },
+                    {
+                        "sha256":  "0A5AEB4B02510792D2F588FA0D4664598D132C5F7412B9B32A92630FDAAD1857",
+                        "path":  "native\\spaceviwerstream\\src\\video_recorder.cpp"
+                    }
+                ],
+    "binaries":  [
+                     {
+                         "sha256":  "7A02CC881DAA07278F5AAC3EAE9E707F90E3DAB11020B916056189DCC9FF592A",
+                         "name":  "SpaceviwerStream.exe"
+                     },
+                     {
+                         "sha256":  "60C80B128342C46BAC8C9619322F4607ED7EE60EA85A19020373943D53452114",
+                         "name":  "SpaceviwerStreamDisplayCtl.exe"
+                     }
+                 ],
+    "version":  "2.2.11",
+    "builtAt":  "2026-09-10T17:48:43.4885509Z"
+}

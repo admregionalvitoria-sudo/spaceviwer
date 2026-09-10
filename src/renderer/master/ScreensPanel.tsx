@@ -120,14 +120,15 @@ export const ScreensPanel: React.FC = () => {
   const handleSetTopology = async (mode: DisplayTopologyMode) => {
     setIsSwitchingTopology(true);
     try {
-      await window.screenflow.setDisplayMode(mode);
+      const result = await window.screenflow.setDisplayMode(mode);
+      if (!result.success) throw new Error(result.error);
       setDisplayMode(mode);
       setActionMessage(mode === 'extended' ? 'Modo Estender ativado no Windows' : 'Modo Duplicar ativado no Windows');
       setTimeout(() => setActionMessage(null), 3000);
       await loadScreensData(true);
     } catch (err: any) {
       console.error('[ScreensPanel] Error setting display mode:', err);
-      setActionMessage('Erro ao alternar modo de exibição.');
+      setActionMessage(err?.message || 'Erro ao alternar modo de exibição.');
     } finally {
       setIsSwitchingTopology(false);
     }
@@ -664,7 +665,7 @@ export const ScreensPanel: React.FC = () => {
                         }}
                         disabled={isUpdatingVirtual}
                         className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer flex items-center space-x-1 shadow-2xs active:scale-95"
-                        title="Remover esta tela virtual do Windows"
+                        title="Reduzir a quantidade de telas virtuais no Windows"
                       >
                         <svg className="w-3 h-3 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

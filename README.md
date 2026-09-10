@@ -1,7 +1,7 @@
 # SpaceViewer
 
 > **Central de Transmissão, Extensão de Telas e Espelhamento de Alta Performance em Rede Local.**  
-> Versão Atual: **v2.2.9** · Licença: **MIT** · Plataforma Alvo: **Windows 10/11 (x64)**
+> Versão Atual: **v2.2.11** · Licença: **MIT** · Plataforma Alvo: **Windows 10/11 (x64)**
 
 ---
 
@@ -10,7 +10,7 @@
 O **SpaceViewer** é uma solução de engenharia de software desenvolvida para transmissão de vídeo de ultra baixa latência, extensão de monitores virtuais e espelhamento em rede local (LAN). O aplicativo opera como uma central unificada que combina:
 
 1. **Extensor de Área de Trabalho Nativo**: Criação dinâmica de monitores virtuais independentes no Windows através do driver IddCx (*Indirect Display Driver* MTT VDD), dispensando adaptadores físicos HDMI falsos (*dummy plugs*).
-2. **Servidor GameStream / Moonlight Nativo**: Host C++20 embarcado de alto desempenho (`SpaceviwerStream.exe`) com aceleração por hardware (NVENC, AMF, Intel QuickSync) via DXGI Desktop Duplication API, permitindo que Smart TVs (LG webOS, Samsung Tizen, Android TV, Google TV, Apple TV e Fire TV) e dispositivos móveis atuem como monitores estendidos ou espelhados sem cabos.
+2. **Servidor GameStream / Moonlight Nativo**: Host C++20 embarcado de alto desempenho (`SpaceviwerStream.exe`) com captura DXGI e codificação H.264 via Media Foundation (hardware quando disponível, com alternativa por software), permitindo que Smart TVs (LG webOS, Samsung Tizen, Android TV, Google TV, Apple TV e Fire TV) e dispositivos móveis atuem como monitores estendidos ou espelhados sem cabos.
 3. **Projeção Seletiva de Aplicativos ("Transmitir Aplicativo")**: Captura direta de janelas individuais de programas em execução no Windows (navegadores, planilhas, softwares corporativos, jogos) e projeção em tela cheia na tela física ou virtual de destino, mantendo a área de trabalho livre para outras atividades.
 4. **Espelhamento P2P WebRTC (Master/Agent)**: Pipeline de streaming bidirecional em tempo real com codecs H.264/VP8/VP9, áudio estéreo em tempo real e sinalização baseada em WebSockets.
 5. **Autodescoberta mDNS / DNS-SD por Hostname**: Anúncio automático do computador na sub-rede por meio de seu nome de host real (`os.hostname()`), eliminando a necessidade de configuração manual de endereços IP nos clientes Moonlight.
@@ -237,7 +237,7 @@ Para assegurar o nível de excelência visual, consistência tipográfica e acab
 
 ## Histórico de Atualizações (Changelog)
 
-### [v2.2.9] — 10 de Setembro de 2026
+### [v2.2.11] — 10 de Setembro de 2026
 - **Inicialização Automática do Host Moonlight**:
   - O servidor GameStream nativo `SpaceviwerStream.exe` agora é iniciado automaticamente no arranque do SpaceViewer sem depender de ação do usuário.
   - Implementada verificação automática com recuperação em segundo plano no carregamento do painel Moonlight.
@@ -331,3 +331,37 @@ node scripts/create_release.js
 - **Repositório GitHub**: [https://github.com/admregionalvitoria-sudo/spaceviwer](https://github.com/admregionalvitoria-sudo/spaceviwer)
 - **Equipe de Desenvolvimento**: SpaceViewer Engineering Team
 - **Licença de Uso**: Licença MIT (Consulte o arquivo `LICENSE` para detalhes).
+
+
+## Servidor integrado 2.2.11
+
+O código usado para gerar o servidor está em `native/spaceviwerstream`, importado do projeto independente SenaiStream fornecido pelo usuário. O aplicativo não executa nem instala Sunshine. Os namespaces originais e avisos de terceiros foram preservados. O executável embarcado é recompilado antes de gerar cada instalador; `resources/spaceviwerstream/build-manifest.json` registra os hashes dos fontes e binários.
+
+### Compilar no Windows
+
+Instale Node.js e MSYS2 em `C:\msys64`, com UCRT64 CMake, Ninja, GCC, pkg-config, OpenSSL e Opus. ENet e GoogleTest estão em `native/spaceviwerstream/third_party`.
+
+```powershell
+npm ci
+npm run typecheck
+npm run test:host
+npm run package:win
+```
+
+`npm run build:native` compila o host, o controlador de telas e executa os testes C++. Para o teste adicional que captura vídeo real do monitor, execute no terminal UCRT64:
+
+```sh
+SPACEVIEWER_TEST_CAPTURE=1 cmake-build-spaceviewer/tests/test_sunshine.exe --gtest_filter=LiveSessions.*
+```
+
+### Operação
+
+- Inicie o host na interface, adicione o IP do computador no Moonlight e confirme o PIN mostrado pela TV.
+- Até quatro clientes com endereços IPv4 distintos na LAN têm sessões independentes. A capacidade real de codificação depende do computador.
+- Com as TVs conectadas, use **Tela enviada para cada TV** para escolher um monitor por cliente. Clientes que usam a mesma tela compartilham uma captura, com codificadores separados.
+- As mudanças de captura reiniciam somente o vídeo; controle e áudio permanecem conectados. Pode ocorrer uma breve pausa durante a reconstrução do codificador.
+- Criar/remover telas altera o dispositivo PnP do Windows. Remover a última desativa o adaptador virtual. O instalador não cria telas automaticamente.
+- A instalação desativa o serviço antigo SenaiStream apenas quando aponta para o caminho de instalação conhecido. O registro anterior fica em `%PROGRAMDATA%\SpaceViewer\previous-host-service.json`; os arquivos antigos são preservados.
+- O servidor integrado usa `%LOCALAPPDATA%\SpaceViewer` para configurações e certificados. Pareamentos de instalações anteriores podem precisar ser refeitos.
+
+Validação automatizada inclui TLS, RTSP, dois clientes ENet, vídeo H.264 por UDP, atualização de captura e cancelamento independente. Isso não substitui a confirmação visual/sonora com os modelos físicos de TV.

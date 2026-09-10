@@ -1,6 +1,6 @@
 {
   "name": "spaceviewer",
-  "version": "2.2.9",
+  "version": "2.2.11",
   "description": "Screen mirroring and casting over local network",
   "repository": {
     "type": "git",
@@ -13,11 +13,13 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package:win": "electron-vite build && electron-builder --win",
+    "package:win": "npm run build:native && electron-vite build && electron-builder --win",
     "package:linux": "electron-vite build && electron-builder --linux",
     "package:mac": "electron-vite build && electron-builder --mac",
     "lint": "eslint src --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-native.ps1",
+    "test:host": "node --test tests/host-regressions.cjs"
   },
   "dependencies": {
     "bonjour-service": "^1.2.1",

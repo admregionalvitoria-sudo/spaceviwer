@@ -172,6 +172,7 @@ export const MoonlightPanel: React.FC = () => {
   // --- Native Host State ---
   const [hostStatus, setHostStatus] = useState<SunshineStatus>('checking');
   const [isToggling, setIsToggling] = useState(false);
+  const [hostError, setHostError] = useState<string | null>(null);
 
   // --- Display Mode & Virtual Display Driver ---
   const [displayMode, setDisplayModeState] = useState<DisplayTopologyMode>('extended');
@@ -181,6 +182,8 @@ export const MoonlightPanel: React.FC = () => {
   const [driverMessage, setDriverMessage] = useState<string | null>(null);
 
   // --- Host Displays & Stream Settings ---
+  const [nativeSessions, setNativeSessions] = useState<{ address: string; display: number }[]>([]);
+  const [updatingSession, setUpdatingSession] = useState<string | null>(null);
   const [displays, setDisplays] = useState<HostDisplayInfo[]>([]);
   const [settings, setSettings] = useState<HostSettings>({
     display: 0,
@@ -229,14 +232,16 @@ export const MoonlightPanel: React.FC = () => {
   // ---- Load Host Displays, Settings & Driver Status ----
   const refreshHostData = useCallback(async () => {
     try {
-      const [driver, hostDisplays, hostSets] = await Promise.all([
+      const [driver, hostDisplays, hostSets, sessions] = await Promise.all([
         window.screenflow.getVirtualDisplayStatus(),
         window.screenflow.getHostDisplays(),
         window.screenflow.getHostSettings(),
+        window.screenflow.getNativeSessions(),
       ]);
 
+      setNativeSessions(sessions);
       setDriverStatus(driver);
-      if (hostDisplays && hostDisplays.length > 0) setDisplays(hostDisplays);
+      setDisplays(hostDisplays || []);
       if (hostSets) {
         setSettings(hostSets);
         setDisplayModeState(hostSets.virtualDisplay ? 'extended' : 'duplicate');
@@ -256,9 +261,10 @@ export const MoonlightPanel: React.FC = () => {
     window.screenflow.getNetworkAddresses().then((ips) => setLocalIps(ips || []));
     window.screenflow.getHostInfo?.().then((info) => {
       if (info) setHostInfo(info);
-    }).catch(() => {});
+    }).catch((error) => setHostError(error.message));
 
     // Listen for GameStream status changes
+    const unsubScreens = window.screenflow.onScreensChanged(() => { refreshHostData(); });
     const unsubStatus = window.screenflow.onGameStreamStatus((status) => {
       setHostStatus(status === 'running' ? 'running' : 'stopped');
       if (status === 'running') {
@@ -269,6 +275,7 @@ export const MoonlightPanel: React.FC = () => {
     // Listen for real-time stream stats pushed from main process
     statsUnsubRef.current = window.screenflow.onMoonlightStreamStats((stats) => {
       setStreamStats(stats);
+      window.screenflow.getNativeSessions().then(setNativeSessions).catch(console.error);
       if (stats.displayMode) {
         setDisplayModeState(stats.displayMode);
       }
@@ -297,6 +304,7 @@ export const MoonlightPanel: React.FC = () => {
     const tvInterval = setInterval(scanSmartTVs, 25000);
 
     return () => {
+      unsubScreens();
       unsubStatus();
       if (statsUnsubRef.current) statsUnsubRef.current();
       unsubTVs();
@@ -350,6 +358,7 @@ export const MoonlightPanel: React.FC = () => {
   const handleToggleHost = async () => {
     if (isToggling) return;
     setIsToggling(true);
+    setHostError(null);
     try {
       if (hostStatus === 'running') {
         userManuallyStoppedRef.current = true;
@@ -364,8 +373,9 @@ export const MoonlightPanel: React.FC = () => {
           await refreshHostData();
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setHostError(err.message);
     } finally {
       setIsToggling(false);
     }
@@ -376,14 +386,9 @@ export const MoonlightPanel: React.FC = () => {
     if (isSwitchingMode) return;
     setIsSwitchingMode(true);
     try {
-      setDisplayModeState(mode);
       const res = await window.screenflow.setDisplayMode(mode);
       if (res.success) {
-        await window.screenflow.setHostSettings({
-          virtualDisplay: mode === 'extended',
-          display: 0,
-        });
-        setSettings((prev) => ({ ...prev, virtualDisplay: mode === 'extended', display: 0 }));
+        setDisplayModeState(mode);
         setSettingsSavedMessage(
           mode === 'duplicate'
             ? 'Modo Duplicar (Espelho) ativado! A tela principal do computador está sendo espelhada na TV.'
@@ -591,6 +596,24 @@ export const MoonlightPanel: React.FC = () => {
         </div>
       </div>
 
+      {hostError && <div role="alert" className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-sm">{hostError}</div>}
+      {nativeSessions.length > 0 && <GlassCard className="p-4 space-y-3">
+        <h3 className="text-sm font-bold">Tela enviada para cada TV</h3>
+        {nativeSessions.map((session) => <div key={session.address} className="flex items-center justify-between gap-3">
+          <span className="text-xs font-mono">{session.address}</span>
+          <select aria-label={`Tela enviada para ${session.address}`} value={session.display} disabled={updatingSession === session.address}
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-xs bg-white"
+            onChange={async (event) => {
+              const display = Number(event.target.value); setUpdatingSession(session.address);
+              try { const result = await window.screenflow.setNativeSessionDisplay(session.address, display);
+                if (!result.success) throw new Error(result.error);
+                setNativeSessions(await window.screenflow.getNativeSessions());
+              } catch (error: any) { setHostError(error.message); } finally { setUpdatingSession(null); }
+            }}>
+            {displays.map((display) => <option key={display.index} value={display.index}>{display.name}{display.virtual ? ' (Virtual)' : ''}</option>)}
+          </select>
+        </div>)}
+      </GlassCard>}
       {/* ── Virtual Display Driver Alert (if not installed) ── */}
       {!driverStatus.installed && (
         <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">

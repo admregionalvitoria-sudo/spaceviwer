@@ -1,4 +1,4 @@
-# SpaceViewer v2.2.9
+# SpaceViewer v2.2.11
 # ============================================================
 # SpaceViewer — NSIS Custom Install Actions
 # Writes the install-mode.json based on installer selection.
@@ -105,36 +105,9 @@ FunctionEnd
   
   FileClose $0
 
-  # Instalar driver de tela virtual integrado (extensor de tela para o Moonlight - 4 telas)
-  ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\driver\virtual-display\MttVDD.inf"
-    DetailPrint "Instalando e sincronizando driver de monitor virtual (4 telas)..."
-    CreateDirectory "C:\VirtualDisplayDriver"
-    CopyFiles /SILENT "$INSTDIR\resources\spaceviwerstream\driver\virtual-display\*.*" "C:\VirtualDisplayDriver\"
-
-    # 1. Adicionar pacote no Driver Store do Windows (DriverStore)
-    nsExec::ExecToLog 'pnputil /add-driver "$INSTDIR\resources\spaceviwerstream\driver\virtual-display\MttVDD.inf" /install'
-    nsExec::ExecToLog 'pnputil /add-driver "C:\VirtualDisplayDriver\MttVDD.inf" /install'
-
-    # 2. Registrar dispositivo PnP via utilitário
-    ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe"
-      nsExec::ExecToLog '"$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe" ensure "$INSTDIR\resources\spaceviwerstream\driver\virtual-display\MttVDD.inf"'
-      nsExec::ExecToLog '"$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe" ensure "C:\VirtualDisplayDriver\MttVDD.inf"'
-    ${EndIf}
-
-    # 3. Executar script instalador dedicado
-    ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\driver\install_driver.bat"
-      nsExec::ExecToLog '"$INSTDIR\resources\spaceviwerstream\driver\install_driver.bat"'
-    ${EndIf}
-
-    # 4. Reiniciar dispositivos PnP e ativar modo estendido
-    nsExec::ExecToLog 'pnputil /restart-device "ROOT\SPACEVIWERSTREAM_VIRTUAL_DISPLAY\0000"'
-    nsExec::ExecToLog 'pnputil /restart-device "ROOT\MTTVDD\0000"'
-    nsExec::ExecToLog 'pnputil /restart-device "SWD\MTT_VDD\0000"'
-    ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe"
-      nsExec::ExecToLog '"$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe" extend'
-    ${EndIf}
-    nsExec::Exec 'DisplaySwitch.exe /extend'
-  ${EndIf}
+  # Monitor creation is controlled by the interface and preserves the user's count.
+  # Stop the superseded standalone host so the integrated server can bind its ports.
+  nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\resources\spaceviwerstream\migrate-host.ps1"'
 
   # Configurar regras de Firewall para GameStream, Descoberta Multicast e SpaceViewer
   DetailPrint "Configurando regras de firewall para descoberta de rede e Moonlight..."
@@ -172,8 +145,8 @@ FunctionEnd
 !macroend
 
 !macro customUnInstall
-  ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe"
-    nsExec::ExecToLog '"$INSTDIR\resources\spaceviwerstream\SpaceviwerStreamDisplayCtl.exe" remove'
+  ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\display-manager.ps1"
+    nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\resources\spaceviwerstream\display-manager.ps1" -Action remove'
   ${EndIf}
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream TCP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream UDP"'

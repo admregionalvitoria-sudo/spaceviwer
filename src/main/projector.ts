@@ -119,7 +119,7 @@ export async function startAppProjector(
     const displays = screen.getAllDisplays();
     const targetDisplay = displays.find(
       (d) => d.id.toString() === displayId || (d.id === screen.getPrimaryDisplay().id && displayId === 'primary')
-    ) || displays[0];
+    );
 
     if (!targetDisplay) {
       return { success: false, error: `Display ${displayId} not found` };
@@ -156,6 +156,7 @@ export async function startAppProjector(
       webPreferences: {
         preload: path.join(__dirname, '../preload/index.js'),
         contextIsolation: true,
+        backgroundThrottling: false,
         webSecurity: false,
       },
     });
@@ -205,7 +206,7 @@ export async function startAppProjector(
       try {
         windowProjectorParams.delete(webContentsId);
       } catch {}
-      activeProjectors.delete(displayId);
+      if (activeProjectors.get(displayId)?.win === win) activeProjectors.delete(displayId);
       notifyChange();
     });
 
@@ -280,12 +281,12 @@ export async function moveWindowToScreen(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const displays = screen.getAllDisplays();
-    const targetDisplay = displays.find((d) => d.id.toString() === displayId) || displays[0];
+    const targetDisplay = displays.find((d) => d.id.toString() === displayId);
     if (!targetDisplay) {
       return { success: false, error: 'Tela de destino não encontrada' };
     }
 
-    const { x, y, width, height } = targetDisplay.bounds;
+    const { x, y, width, height } = screen.dipToScreenRect(null, targetDisplay.bounds);
     let hwndVal = 0;
     if (sourceId && sourceId.startsWith('window:')) {
       const parsed = parseInt(sourceId.split(':')[1], 10);
@@ -301,6 +302,7 @@ Add-Type @"
   using System;
   using System.Runtime.InteropServices;
   public class Win32Mover {
+    [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")]
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     [DllImport("user32.dll")]
@@ -331,10 +333,11 @@ if ($targetHwnd -eq [IntPtr]::Zero -and "${escapedTitle}") {
 }
 
 if ($targetHwnd -ne [IntPtr]::Zero) {
+  [Win32Mover]::SetThreadDpiAwarenessContext([IntPtr](-4)) | Out-Null
   # SW_RESTORE (9) in case window is minimized
   [Win32Mover]::ShowWindow($targetHwnd, 9)
   # Move and resize to target screen coordinates (SWP_SHOWWINDOW = 0x0040)
-  [Win32Mover]::SetWindowPos($targetHwnd, [IntPtr]::Zero, ${x}, ${y}, ${width}, ${height}, 0x0040)
+  if (-not [Win32Mover]::SetWindowPos($targetHwnd, [IntPtr]::Zero, ${x}, ${y}, ${width}, ${height}, 0x0040)) { throw 'O Windows recusou mover a janela.' }
   # SW_MAXIMIZE (3) so the app cleanly occupies the target display
   [Win32Mover]::ShowWindow($targetHwnd, 3)
   [Win32Mover]::SetForegroundWindow($targetHwnd)
@@ -354,5 +357,15 @@ if ($targetHwnd -ne [IntPtr]::Zero) {
   } catch (err: any) {
     console.error('[Projector] Move window error:', err);
     return { success: false, error: err?.message || 'Falha ao mover a janela' };
+  }
+}
+
+/** Updates live projectors after a display is moved, resized or removed. */
+export function refreshProjectorDisplays(): void {
+  const displays = screen.getAllDisplays();
+  for (const [id, entry] of activeProjectors) {
+    const display = displays.find((d) => String(d.id) === id || (id === 'primary' && d.id === screen.getPrimaryDisplay().id));
+    if (!display) { entry.win.destroy(); activeProjectors.delete(id); }
+    else if (!entry.win.isDestroyed()) entry.win.setBounds(display.bounds);
   }
 }

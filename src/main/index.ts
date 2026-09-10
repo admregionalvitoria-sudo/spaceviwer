@@ -28,9 +28,13 @@ import {
   moveWindowToScreen,
   setProjectorChangeListener,
   getProjectorParamsForWindow,
+  refreshProjectorDisplays,
 } from './projector';
 import {
   checkHostStatus,
+  refreshHostCapture,
+  getNativeSessions,
+  setNativeSessionDisplay,
   startHost,
   stopHost,
   restartHost,
@@ -310,9 +314,18 @@ async function createWindow() {
       mainWindow.webContents.send('screens-changed');
     }
   };
-  screen.on('display-added', notifyScreensChanged);
-  screen.on('display-removed', notifyScreensChanged);
-  screen.on('display-metrics-changed', notifyScreensChanged);
+  let displayChangeTimer: NodeJS.Timeout | undefined;
+  const onDisplayChange = () => {
+    if (displayChangeTimer) clearTimeout(displayChangeTimer);
+    displayChangeTimer = setTimeout(() => {
+      refreshProjectorDisplays();
+      refreshHostCapture().catch(console.error);
+      for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('screens-changed');
+    }, 500);
+  };
+  screen.on('display-added', onDisplayChange);
+  screen.on('display-removed', onDisplayChange);
+  screen.on('display-metrics-changed', onDisplayChange);
   setProjectorChangeListener(notifyScreensChanged);
 }
 
@@ -526,6 +539,8 @@ function registerIpcHandlers() {
     return await getHostDisplays();
   });
 
+  ipcMain.handle('get-native-sessions', () => getNativeSessions());
+  ipcMain.handle('set-native-session-display', (_, address: string, display: number) => setNativeSessionDisplay(address, display));
   ipcMain.handle('get-host-settings', async () => {
     return await getHostSettings();
   });

@@ -7,7 +7,8 @@ import { desktopCapturer, screen } from 'electron';
 import { exec } from 'child_process';
 import type { AppWindowSource, DetailedScreenInfo, ScreenSource } from '../shared/types';
 import { getActiveProjectors } from './projector';
-import { getVirtualDisplayStatus, getSunshineConfig } from './gamestream-host';
+import { getHostDisplays, getHostSettings } from './gamestream-host';
+import { getWindowsDisplayInventory, matchWindowsDisplay } from './windows-displays';
 
 /**
  * Lists all available screens and windows for capture.
@@ -40,33 +41,15 @@ export async function getScreensDetailed(): Promise<DetailedScreenInfo[]> {
     });
 
     const activeProjectors = getActiveProjectors();
-    let virtualInstalled = false;
-    try {
-      const vdd = await getVirtualDisplayStatus();
-      virtualInstalled = vdd.installed || vdd.active;
-    } catch {}
-
-    let moonlightConfig: any = null;
-    try {
-      moonlightConfig = await getSunshineConfig();
-    } catch {}
+    const [inventory, hostDisplays, settings] = await Promise.all([getWindowsDisplayInventory(), getHostDisplays(), getHostSettings()]);
 
     return displays.map((disp, idx) => {
       const isPrimary = disp.id === primaryDisplay.id;
-      let matchedSource = sources.find((s) => s.display_id === disp.id.toString());
-      if (!matchedSource) {
-        matchedSource = sources[idx] || sources[0];
-      }
-
-      const sourceId = matchedSource?.id || `screen:${idx}:0`;
-      const isVirtual = !isPrimary && (virtualInstalled || idx > 0);
-
-      // Check if this screen is specifically targeted by Moonlight
-      const isMoonlightTarget = Boolean(
-        moonlightConfig &&
-          (moonlightConfig.selectedSourceId === sourceId ||
-           moonlightConfig.captureDisplayIndex === idx)
-      );
+      const matchedSource = sources.find((s) => s.display_id === String(disp.id));
+      const sourceId = matchedSource?.id || '';
+      const native = matchWindowsDisplay(disp, inventory.displays);
+      const isVirtual = native?.isVirtual ?? false;
+      const isMoonlightTarget = Boolean(native && hostDisplays.some((d) => d.index === settings.display && d.deviceName.toLowerCase() === native.deviceName.toLowerCase()));
 
       const projected = activeProjectors[disp.id.toString()] || null;
 

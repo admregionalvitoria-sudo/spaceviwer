@@ -35,3 +35,6 @@ scratch/
 .user_uploaded/
 .system_generated/
 *.tmp
+
+cmake-build-*/
+Sunshine-master/

@@ -60,6 +60,8 @@ const api: ScreenFlowAPI = {
   installVirtualDisplayDriver: () => ipcRenderer.invoke('install-virtual-display-driver'),
   setDisplayMode: (mode) => ipcRenderer.invoke('set-display-mode', mode),
   getHostDisplays: () => ipcRenderer.invoke('get-host-displays'),
+  getNativeSessions: () => ipcRenderer.invoke('get-native-sessions'),
+  setNativeSessionDisplay: (address, display) => ipcRenderer.invoke('set-native-session-display', address, display),
   getHostSettings: () => ipcRenderer.invoke('get-host-settings'),
   setHostSettings: (settings) => ipcRenderer.invoke('set-host-settings', settings),
 

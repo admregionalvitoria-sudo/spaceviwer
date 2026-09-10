@@ -331,6 +331,8 @@ export interface ScreenFlowAPI {
   installVirtualDisplayDriver: () => Promise<{ success: boolean; error?: string; rebootRequired?: boolean }>;
   setDisplayMode: (mode: DisplayTopologyMode) => Promise<{ success: boolean; error?: string }>;
   getHostDisplays: () => Promise<HostDisplayInfo[]>;
+  getNativeSessions: () => Promise<{ address: string; display: number }[]>;
+  setNativeSessionDisplay: (address: string, display: number) => Promise<{ success: boolean; error?: string }>;
   getHostSettings: () => Promise<HostSettings>;
   setHostSettings: (settings: Partial<HostSettings>) => Promise<{ success: boolean; error?: string }>;
 

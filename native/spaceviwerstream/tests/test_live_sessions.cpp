@@ -1,0 +1,271 @@
+#include "senaistream/gamestream_host.hpp"
+#include "senaistream/pairing.hpp"
+
+#include <chrono>
+#include <enet/enet.h>
+#include <filesystem>
+#include <fstream>
+#include <gtest/gtest.h>
+#include <openssl/pem.h>
+#include <openssl/ssl.h>
+#include <thread>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+namespace {
+  constexpr std::uint16_t test_port = 57089;  ///< Isolated HTTP base, never the production listener.
+
+  /** @brief Converts a loopback peer into the ENet address structure. @param ip IPv4 text. @param port Port. @return Address. */
+  ENetAddress address(const char *ip, std::uint16_t port) {
+    sockaddr_in raw {};
+    raw.sin_family = AF_INET;
+    raw.sin_port = htons(port);
+    inet_pton(AF_INET, ip, &raw.sin_addr);
+    ENetAddress result {};
+    enet_address_set_address(&result, reinterpret_cast<sockaddr *>(&raw), sizeof(raw));
+    enet_address_set_port(&result, port);
+    return result;
+  }
+
+  /** @brief Sends one bounded HTTP/TLS request from a distinct LAN-equivalent address.
+   * @param ip Source address. @param port Destination port. @param request HTTP text. @param tls Optional TLS context.
+   * @return Complete response or error text.
+   */
+  std::string exchange(const char *ip, std::uint16_t port, const std::string &request, SSL_CTX *tls = nullptr) {
+    SOCKET socket = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (socket == INVALID_SOCKET) {
+      return "socket failed";
+    }
+    const DWORD timeout = 5000;
+    setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char *>(&timeout), sizeof(timeout));
+    auto local = address(ip, 0);
+    auto remote = address("127.0.0.1", port);
+    if (bind(socket, reinterpret_cast<const sockaddr *>(&local.address), local.addressLength) || connect(socket, reinterpret_cast<const sockaddr *>(&remote.address), remote.addressLength)) {
+      closesocket(socket);
+      return "connect failed";
+    }
+    SSL *ssl = tls ? SSL_new(tls) : nullptr;
+    if (ssl) {
+      SSL_set_fd(ssl, static_cast<int>(socket));
+      if (SSL_connect(ssl) != 1) {
+        SSL_free(ssl);
+        closesocket(socket);
+        return "TLS failed";
+      }
+      SSL_write(ssl, request.data(), static_cast<int>(request.size()));
+    } else {
+      send(socket, request.data(), static_cast<int>(request.size()), 0);
+    }
+    std::string response;
+    char buffer[8192];
+    int received = 0;
+    while ((received = ssl ? SSL_read(ssl, buffer, sizeof(buffer)) : recv(socket, buffer, sizeof(buffer), 0)) > 0) {
+      response.append(buffer, received);
+    }
+    if (ssl) {
+      SSL_free(ssl);
+    }
+    closesocket(socket);
+    return response;
+  }
+
+  /** @brief Constructs a complete form request. @param endpoint API path. @param body Form content. @return HTTP request. */
+  std::string post(const std::string &endpoint, const std::string &body) {
+    return "POST " + endpoint + " HTTP/1.1\r\nHost: localhost\r\nContent-Length: " + std::to_string(body.size()) + "\r\n\r\n" + body;
+  }
+
+  /** @brief Ensures native test resources are shut down even after an assertion fails. */
+  struct LiveHost {
+    std::filesystem::path state;  ///< Private test state directory.
+    senaistream::GameStreamHost host {{"SpaceViewer Test", "test", "127.0.0.1", test_port, test_port - 5}};  ///< Isolated host.
+    std::thread worker;  ///< Server loop.
+    ENetHost *first {}, *second {};  ///< Simulated TVs.
+    SSL_CTX *tls {};  ///< Paired client identity.
+    SOCKET video[2] {INVALID_SOCKET, INVALID_SOCKET};  ///< Optional real capture receivers.
+
+    /** @brief Pumps client acknowledgements while waiting for video. */
+    void pump() {
+      for (auto *client : {first, second}) {
+        if (client) {
+          ENetEvent event {};
+          while (enet_host_service(client, &event, 0) > 0) {
+            if (event.type == ENET_EVENT_TYPE_RECEIVE) {
+              enet_packet_destroy(event.packet);
+            }
+          }
+        }
+      }
+    }
+
+    /** @brief Waits for an actual video datagram. @param socket Receiver. @return Received byte count. */
+    int receive_video(SOCKET socket) {
+      char packet[2048];
+      for (int i = 0; i < 500; ++i) {
+        pump();
+        fd_set readable;
+        FD_ZERO(&readable);
+        FD_SET(socket, &readable);
+        timeval timeout {0, 20'000};
+        if (select(0, &readable, nullptr, nullptr, &timeout) > 0) {
+          return recv(socket, packet, sizeof(packet), 0);
+        }
+      }
+      return 0;
+    }
+
+    /** @brief Stops clients before joining and deleting isolated test state. */
+    ~LiveHost() {
+      if (first) {
+        enet_host_destroy(first);
+      }
+      if (second) {
+        enet_host_destroy(second);
+      }
+      host.request_stop();
+      if (worker.joinable()) {
+        worker.join();
+      }
+      for (auto socket : video) {
+        if (socket != INVALID_SOCKET) {
+          closesocket(socket);
+        }
+      }
+      if (tls) {
+        SSL_CTX_free(tls);
+      }
+      _putenv_s("SPACEVIEWER_DATA_DIR", "");
+      std::error_code ignored;
+      if (!state.empty()) {
+        std::filesystem::remove_all(state, ignored);
+      }
+      enet_deinitialize();
+      WSACleanup();
+    }
+  };
+
+  TEST(LiveSessions, TwoControlClientsSurviveCaptureRefreshAndIndependentCancel) {
+    WSADATA winsock {};
+    ASSERT_EQ(WSAStartup(MAKEWORD(2, 2), &winsock), 0);
+    ASSERT_EQ(enet_initialize(), 0);
+    const auto state = std::filesystem::temp_directory_path() / ("spaceviewer-live-" + std::to_string(GetCurrentProcessId()));
+    _putenv_s("SPACEVIEWER_DATA_DIR", state.string().c_str());
+    LiveHost running;
+    running.state = state;
+    senaistream::PairingManager identity;
+    ASSERT_TRUE(identity.initialize(state).ok());
+    const auto certificate = identity.host_certificate_pem();
+    const auto key = identity.host_private_key_pem();
+    // A test-owned certificate is preauthorized, without touching the user's pairings.
+    std::ofstream(state / "clients" / "test.pem") << certificate;
+    running.tls = SSL_CTX_new(TLS_client_method());
+    ASSERT_NE(running.tls, nullptr);
+    SSL_CTX_set_verify(running.tls, SSL_VERIFY_NONE, nullptr);
+    BIO *cert_bio = BIO_new_mem_buf(certificate.data(), static_cast<int>(certificate.size()));
+    BIO *key_bio = BIO_new_mem_buf(key.data(), static_cast<int>(key.size()));
+    X509 *cert = PEM_read_bio_X509(cert_bio, nullptr, nullptr, nullptr);
+    EVP_PKEY *private_key = PEM_read_bio_PrivateKey(key_bio, nullptr, nullptr, nullptr);
+    ASSERT_EQ(SSL_CTX_use_certificate(running.tls, cert), 1);
+    ASSERT_EQ(SSL_CTX_use_PrivateKey(running.tls, private_key), 1);
+    X509_free(cert);
+    EVP_PKEY_free(private_key);
+    BIO_free(cert_bio);
+    BIO_free(key_bio);
+    running.worker = std::thread([&] {
+      EXPECT_TRUE(running.host.run().ok());
+    });
+    const std::string status_request = "GET /api/status HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    std::string status;
+    for (int i = 0; i < 40; ++i) {
+      status = exchange("127.0.0.1", test_port + 1, status_request);
+      if (status.find("SpaceViewer") != std::string::npos) {
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    ASSERT_NE(status.find("\"apiVersion\":2"), std::string::npos) << status;
+    auto remote = address("127.0.0.1", test_port + 10);
+    ENetPeer *second_peer = nullptr;
+    int connected = 0;
+    for (int i = 0; i < 2; ++i) {
+      const char *ip = i == 0 ? "127.0.0.2" : "127.0.0.3";
+      const std::string launch = "GET /launch?rikey=" + std::string(32, i == 0 ? '1' : '2') + "&rikeyid=1&mode=320x240x5 HTTP/1.1\r\nHost: localhost\r\n\r\n";
+      const auto launched = exchange(ip, test_port - 5, launch, running.tls);
+      ASSERT_NE(launched.find("<gamesession>1</gamesession>"), std::string::npos) << launched;
+      // Announce each client's media parameters on a separate RTSP transaction.
+      const auto announced = exchange(ip, test_port + 21, "ANNOUNCE rtsp://localhost/ RTSP/1.0\r\nCSeq: 1\r\nContent-length: 0\r\n\r\n");
+      ASSERT_NE(announced.find("200 OK"), std::string::npos);
+      auto local = address(ip, 0);
+      auto *client = enet_host_create(AF_INET, &local, 1, 48, 0, 0);
+      ASSERT_NE(client, nullptr);
+      if (i == 0) {
+        running.first = client;
+      } else {
+        running.second = client;
+      }
+      auto *peer = enet_host_connect(client, &remote, 48, 0);
+      ASSERT_NE(peer, nullptr);
+      if (i == 1) {
+        second_peer = peer;
+      }
+      ENetEvent event {};
+      for (int attempt = 0; attempt < 50; ++attempt) {
+        if (enet_host_service(client, &event, 100) > 0 && event.type == ENET_EVENT_TYPE_CONNECT) {
+          ++connected;
+          enet_host_flush(client);
+          break;
+        }
+      }
+    }
+    ASSERT_EQ(connected, 2);
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    status = exchange("127.0.0.1", test_port + 1, status_request);
+    EXPECT_NE(status.find("\"activeClients\":2"), std::string::npos) << status;
+    if (std::getenv("SPACEVIEWER_TEST_CAPTURE")) {
+      const auto configured = exchange("127.0.0.1", test_port + 1, post("/api/settings", "display=0&width=320&height=240&fps=5&bitrateMbps=1&hardware=0&virtualDisplay=0"));
+      ASSERT_NE(configured.find("200 OK"), std::string::npos) << configured;
+      for (int i = 0; i < 2; ++i) {
+        running.video[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        auto local = address(i == 0 ? "127.0.0.2" : "127.0.0.3", 0);
+        ASSERT_EQ(bind(running.video[i], reinterpret_cast<const sockaddr *>(&local.address), local.addressLength), 0);
+        auto destination = address("127.0.0.1", test_port + 9);
+        ASSERT_EQ(sendto(running.video[i], "PING", 4, 0, reinterpret_cast<const sockaddr *>(&destination.address), destination.addressLength), 4);
+      }
+      EXPECT_GT(running.receive_video(running.video[0]), 16);
+      EXPECT_GT(running.receive_video(running.video[1]), 16);
+    }
+    EXPECT_NE(exchange("127.0.0.1", test_port + 1, post("/api/refresh-capture", "")).find("200 OK"), std::string::npos);
+    if (std::getenv("SPACEVIEWER_TEST_CAPTURE")) {
+      for (int i = 0; i < 30; ++i) {
+        running.pump();
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      }
+      for (auto socket : running.video) {
+        u_long nonblocking = 1;
+        ioctlsocket(socket, FIONBIO, &nonblocking);
+        char stale[2048];
+        while (recv(socket, stale, sizeof(stale), 0) > 0) {}
+        nonblocking = 0;
+        ioctlsocket(socket, FIONBIO, &nonblocking);
+        EXPECT_GT(running.receive_video(socket), 16);
+      }
+    }
+    EXPECT_NE(exchange("127.0.0.1", test_port + 1, status_request).find("\"activeClients\":2"), std::string::npos);
+    const auto cancel = exchange("127.0.0.2", test_port - 5, "GET /cancel HTTP/1.1\r\nHost: localhost\r\n\r\n", running.tls);
+    EXPECT_NE(cancel.find("<gamesession>1</gamesession>"), std::string::npos);
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    status = exchange("127.0.0.1", test_port + 1, status_request);
+    EXPECT_NE(status.find("\"activeClients\":1"), std::string::npos) << status;
+    EXPECT_EQ(second_peer->state, ENET_PEER_STATE_CONNECTED);
+    if (std::getenv("SPACEVIEWER_TEST_CAPTURE")) {
+      EXPECT_NE(exchange("127.0.0.1", test_port + 1, post("/api/session-display", "address=127.0.0.3&display=0")).find("200 OK"), std::string::npos);
+      EXPECT_EQ(exchange("127.0.0.1", test_port + 1, post("/api/session-display", "address=127.0.0.3&display=999")).find("200 OK"), std::string::npos);
+      u_long nonblocking = 1;
+      ioctlsocket(running.video[1], FIONBIO, &nonblocking);
+      char stale[2048];
+      while (recv(running.video[1], stale, sizeof(stale), 0) > 0) {}
+      nonblocking = 0;
+      ioctlsocket(running.video[1], FIONBIO, &nonblocking);
+      EXPECT_GT(running.receive_video(running.video[1]), 16);
+    }
+  }
+}  // namespace

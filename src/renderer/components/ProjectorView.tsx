@@ -38,6 +38,13 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({ sourceId, appName,
 
   useEffect(() => {
     let isMounted = true;
+    let recoveryTimer: ReturnType<typeof setTimeout> | undefined;
+    const recoverCapture = () => {
+      if (!isMounted) return;
+      if (recoveryTimer) clearTimeout(recoveryTimer);
+      recoveryTimer = setTimeout(() => { if (isMounted) setRetryTrigger((value) => value + 1); }, 700);
+    };
+    const unsubscribeScreens = window.screenflow.onScreensChanged(recoverCapture);
 
     async function initCapture() {
       try {
@@ -92,6 +99,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({ sourceId, appName,
         }
 
         streamRef.current = stream;
+        stream.getVideoTracks().forEach((track) => track.addEventListener("ended", recoverCapture));
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
@@ -123,6 +131,8 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({ sourceId, appName,
 
     return () => {
       isMounted = false;
+      unsubscribeScreens();
+      if (recoveryTimer) clearTimeout(recoveryTimer);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('mousemove', resetHudTimer);
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);

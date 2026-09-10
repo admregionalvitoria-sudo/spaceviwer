@@ -1,4 +1,4 @@
-// SpaceViewer v2.2.9
+# SpaceViewer v2.2.11
 appId: com.spaceviewer.app
 productName: SpaceViewer
 copyright: "© 2026 SpaceViewer"
@@ -40,7 +40,7 @@ linux:
   icon: resources/icon.png
   target:
     - deb
-      - AppImage
+    - AppImage
   category: Network
   description: Screen mirroring and casting over local network
 
