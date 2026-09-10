@@ -1,3 +1,4 @@
+// SpaceViewer v2.2.9
 import { createServer, Server } from 'http';
 import { EventEmitter } from 'events';
 

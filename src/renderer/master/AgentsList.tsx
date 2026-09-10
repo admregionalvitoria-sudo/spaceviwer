@@ -1,3 +1,4 @@
+// SpaceViewer v2.2.9
 import React, { useEffect, useState } from 'react';
 import { useMasterStore } from '../stores/masterStore';
 import { GlassCard } from '../components/ui/GlassCard';

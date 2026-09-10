@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-title SpaceViewer - Gerador de Executavel Atualizado
+title SpaceViewer v2.2.9 - Gerador de Executavel Atualizado
 color 0b
 
 net session >nul 2>&1
@@ -11,7 +11,7 @@ if %errorLevel% NEQ 0 (
 )
 
 echo ===================================================
-echo             SPACEVIEWER BUILD SYSTEM
+echo             SPACEVIEWER BUILD SYSTEM v2.2.9
 echo ===================================================
 echo.
 echo Diretorio: %CD%
@@ -40,6 +40,10 @@ echo.
 echo [3/3] Sincronizando instalador entre as pastas de saida...
 if not exist "dist-installer" mkdir "dist-installer" >nul 2>&1
 if not exist "dist-electron" mkdir "dist-electron" >nul 2>&1
+if exist "dist-package\SpaceViewer-Setup-*.exe" (
+    copy /Y "dist-package\SpaceViewer-Setup-*.exe" "dist-installer\" >nul
+    copy /Y "dist-package\SpaceViewer-Setup-*.exe" "dist-electron\" >nul
+)
 if exist "dist-build\SpaceViewer-Setup-*.exe" (
     copy /Y "dist-build\SpaceViewer-Setup-*.exe" "dist-installer\" >nul
     copy /Y "dist-build\SpaceViewer-Setup-*.exe" "dist-electron\" >nul
@@ -55,8 +59,9 @@ echo ====================================================================
 echo   CONCLUIDO COM SUCESSO!
 echo.
 echo   Instalador gerado com permissao de Administrador (perMachine: true):
-echo   - dist-installer\SpaceViewer-Setup-2.2.2.exe
-echo   - dist-electron\SpaceViewer-Setup-2.2.2.exe
+echo   - dist-package\SpaceViewer-Setup-2.2.9.exe
+echo   - dist-installer\SpaceViewer-Setup-2.2.9.exe
+echo   - dist-electron\SpaceViewer-Setup-2.2.9.exe
 echo.
 echo   O instalador ira registrar automaticamente o Driver de Tela Virtual
 echo   (MTT VDD) para que o Moonlight funcione no modo TELA ESTENDIDA!

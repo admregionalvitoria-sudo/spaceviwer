@@ -1,3 +1,4 @@
+# SpaceViewer v2.2.9
 # ============================================================
 # SpaceViewer — NSIS Custom Install Actions
 # Writes the install-mode.json based on installer selection.

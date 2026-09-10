@@ -1,3 +1,4 @@
+// SpaceViewer v2.2.9
 import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'

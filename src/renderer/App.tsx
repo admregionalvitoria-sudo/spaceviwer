@@ -1,3 +1,4 @@
+// SpaceViewer v2.2.9
 import React, { useEffect, useState } from 'react';
 import type { InstallMode } from '../shared/types';
 import { APP_VERSION } from '../shared/constants';

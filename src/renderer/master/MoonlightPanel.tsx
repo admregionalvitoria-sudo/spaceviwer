@@ -1,3 +1,4 @@
+// SpaceViewer v2.2.9
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GlassCard } from '../components/ui/GlassCard';
 import type {

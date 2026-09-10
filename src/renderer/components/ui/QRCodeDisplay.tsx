@@ -1,3 +1,4 @@
+// SpaceViewer v2.2.9
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { GlassCard } from './GlassCard';

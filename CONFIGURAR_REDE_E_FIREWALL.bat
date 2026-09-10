@@ -1,3 +1,4 @@
+:: SpaceViewer v2.2.9
 @echo off
 cd /d "%~dp0"
 title SpaceViewer - Configurador de Rede, Firewall e Moonlight

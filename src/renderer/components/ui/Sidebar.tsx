@@ -1,3 +1,4 @@
+// SpaceViewer v2.2.9
 import React from 'react';
 import clsx from 'clsx';
 import logoUrl from '../../assets/logo.png';

@@ -1,3 +1,4 @@
+// SpaceViewer v2.2.9
 import React, { useEffect, useRef, useState } from 'react';
 import { useMasterStore } from '../stores/masterStore';
 import { TitleBar } from '../components/ui/TitleBar';

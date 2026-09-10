@@ -1,3 +1,4 @@
+// SpaceViewer v2.2.9
 import * as http from 'http';
 import * as os from 'os';
 import { networkInterfaces } from 'os';
