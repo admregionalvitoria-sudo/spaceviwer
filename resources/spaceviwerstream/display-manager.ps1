@@ -36,6 +36,9 @@ try {
             if (Test-Path -LiteralPath $settingsPath) {
                 [xml]$settings = Get-Content -LiteralPath $settingsPath -Raw
                 $settings.vdd_settings.monitors.count = '1'
+                if ($null -ne $settings.vdd_settings.options.HardwareCursor) {
+                    $settings.vdd_settings.options.HardwareCursor = 'false'
+                }
                 $settings.Save($settingsPath)
             }
         }
@@ -47,12 +50,15 @@ try {
             $adapters = @(Get-VirtualAdapters)
             if ($adapters.Count -eq 0) { throw 'O Windows nao registrou o dispositivo virtual.' }
         }
-        if ($Action -eq 'set-count') {
-            if (!(Test-Path -LiteralPath $settingsPath)) { throw 'Configuracao do driver virtual nao encontrada.' }
-            $previousSettings = Get-Content -LiteralPath $settingsPath -Raw
-            [xml]$settings = $previousSettings
-            $settings.vdd_settings.monitors.count = '1'
-            $settings.Save($settingsPath)
+        if ($Action -eq 'set-count' -or $Action -eq 'enable') {
+            if (Test-Path -LiteralPath $settingsPath) {
+                [xml]$settings = Get-Content -LiteralPath $settingsPath -Raw
+                $settings.vdd_settings.monitors.count = '1'
+                if ($null -ne $settings.vdd_settings.options.HardwareCursor) {
+                    $settings.vdd_settings.options.HardwareCursor = 'false'
+                }
+                $settings.Save($settingsPath)
+            }
         }
         # If there are duplicate virtual display adapters in PnP, disable any extras beyond the first
         if ($adapters.Count -gt 1) {

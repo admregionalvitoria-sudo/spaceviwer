@@ -1,5 +1,4 @@
-## SpaceViewer 2.2.19
+## SpaceViewer 2.2.20
 
-- **Áudio Nativo Unificado e Automático**: Todos os dispositivos conectados via Moonlight agora puxam sempre o mesmo áudio do Windows (`system audio`) nativamente, sem necessidade de configuração manual ou separação de dispositivos.
-- **Interface Simplificada**: Removidas todas as opções complexas de áudio por dispositivo, seletores de processos e alertas da interface do usuário (UX), mantendo o painel limpo, focado em estabilidade de vídeo e alta nitidez.
-- **Sincronização Contínua de Áudio**: O monitorador em segundo plano garante que qualquer TV conectada passe a receber imediatamente o áudio unificado do sistema em perfeita sincronia com a imagem da tela virtual.
+- **Cursor do Mouse Visível na Tela Virtual**: Corrigida a invisibilidade do cursor do mouse ao movê-lo para a tela virtual estendida (`HardwareCursor: false`). O Windows agora renderiza o cursor via software diretamente sobre o framebuffer do monitor virtual, tornando o ponteiro do mouse 100% visível, fluido e sincronizado em transmissões Moonlight e nas Smart TVs.
+- **Sincronização do Driver MTT VDD**: Configuração aplicada diretamente em `vdd_settings.xml` e no script gerenciador de telas para garantir que toda ativação de monitor virtual exiba o cursor perfeitamente.
