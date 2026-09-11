@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-title SpaceViewer v2.2.16 - Gerador de Executavel Atualizado
+title SpaceViewer v2.2.17 - Gerador de Executavel Atualizado
 color 0b
 
 net session >nul 2>&1
@@ -11,7 +11,7 @@ if %errorLevel% NEQ 0 (
 )
 
 echo ===================================================
-echo             SPACEVIEWER BUILD SYSTEM v2.2.16
+echo             SPACEVIEWER BUILD SYSTEM v2.2.17
 echo ===================================================
 echo.
 echo Diretorio: %CD%

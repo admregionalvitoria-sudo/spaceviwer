@@ -1,9 +1,8 @@
-## SpaceViewer 2.2.16
+## SpaceViewer 2.2.17
+ 
+- Limita o sistema a 1 tela virtual estendida para redução drástica do consumo de GPU e estabilização de rede.
+- Espelhamento simultâneo unificado: todos os aparelhos e Smart TVs conectados via Moonlight passam a espelhar a mesma tela virtual automaticamente.
+- Interface simplificada no Gerenciador de Telas com ativação direta da tela virtual única.
+- Sincronização automática em tempo real de novas conexões Moonlight para a tela virtual ativa.
+- Áudio compartilhado do Windows em perfeita sincronia para todas as TVs conectadas.
 
-- Corrige leitura dos espaços finais nos atributos SDP enviados pelo Moonlight real.
-- Respeita a criptografia e a duração dos pacotes de áudio negociadas, evitando envio de áudio que a TV não consegue decodificar.
-- Mantém áudio compartilhado via VB-CABLE e telas independentes.
-
-Regressão reproduzida antes da correção: o receptor falhava ao descriptografar pacotes ao usar o formato real do Moonlight (atributos terminados em espaço e CRLF). O teste foi atualizado para preservar esse formato.
-
-Após instalar, reconecte o Moonlight nas TVs para refazer a negociação.

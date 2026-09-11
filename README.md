@@ -1,7 +1,7 @@
 # SpaceViewer
 
 > **Central de Transmissão, Extensão de Telas e Espelhamento de Alta Performance em Rede Local.**  
-> Versão Atual: **v2.2.16** · Licença: **MIT** · Plataforma Alvo: **Windows 10/11 (x64)**
+> Versão Atual: **v2.2.17** · Licença: **MIT** · Plataforma Alvo: **Windows 10/11 (x64)**
 
 ---
 
