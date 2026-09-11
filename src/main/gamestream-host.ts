@@ -206,6 +206,9 @@ export async function syncAllSessionsToVirtualDisplay(): Promise<void> {
     if (session.display !== target.index || session.display < 0) {
       await setNativeSessionDisplay(session.address, target.index).catch(() => {});
     }
+    if (session.audioMode !== 'system') {
+      await setNativeSessionAudio(session.address, 'system').catch(() => {});
+    }
   }
 }
 
@@ -221,6 +224,9 @@ export async function setMoonlightScreen(sourceId: string, sources: ScreenSource
     const sessions = await getNativeSessions();
     for (const session of sessions) {
       await setNativeSessionDisplay(session.address, target.index).catch(() => {});
+      if (session.audioMode !== 'system') {
+        await setNativeSessionAudio(session.address, 'system').catch(() => {});
+      }
     }
   }
   return res;

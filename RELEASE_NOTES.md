@@ -1,7 +1,5 @@
-## SpaceViewer 2.2.18
+## SpaceViewer 2.2.19
 
-- **Tela Virtual Única e Definitiva**: Configuração do driver VDD travada em `<count>1</count>` e desativação automática de adaptadores duplicados no Windows. Apenas 1 monitor virtual Moonlight é criado e listado no sistema.
-- **Transmissão Fluida em Tempo Real ao Estender**: Corrigido o congelamento de imagem ao alternar para tela estendida. O sistema aguarda a estabilização da topologia do Windows (DXGI), reatribui as sessões ativas à tela virtual e reinicia a captura automaticamente sem interrupções.
-- **Alta Nitidez e Fim da Transmissão Embaçada**: Seletor nativo de resolução (1080p Full HD, 2K QHD, 4K Ultra HD) e taxa de bits ajustável (20 Mbps a 80 Mbps). Padrão elevado para 1080p a 40 Mbps 60 FPS, garantindo nitidez absoluta de textos e imagens nas TVs.
-- **Controles em Tempo Real**: Adicionados botões "Destravar Transmissão" e "Sincronizar em Tempo Real" no painel de espelhamento das TVs.
-- **Áudio Compartilhado**: Sincronização direta de som do Windows com todas as TVs pareadas.
+- **Áudio Nativo Unificado e Automático**: Todos os dispositivos conectados via Moonlight agora puxam sempre o mesmo áudio do Windows (`system audio`) nativamente, sem necessidade de configuração manual ou separação de dispositivos.
+- **Interface Simplificada**: Removidas todas as opções complexas de áudio por dispositivo, seletores de processos e alertas da interface do usuário (UX), mantendo o painel limpo, focado em estabilidade de vídeo e alta nitidez.
+- **Sincronização Contínua de Áudio**: O monitorador em segundo plano garante que qualquer TV conectada passe a receber imediatamente o áudio unificado do sistema em perfeita sincronia com a imagem da tela virtual.
