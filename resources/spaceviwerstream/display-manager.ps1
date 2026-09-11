@@ -1,7 +1,7 @@
 param(
     [ValidateSet('query', 'set-count', 'enable', 'disable', 'install', 'remove')]
     [string]$Action = 'query',
-    [ValidateRange(1, 4)][int]$Count = 1
+    [ValidateRange(1, 1)][int]$Count = 1
 )
 $ErrorActionPreference = 'Stop'
 
@@ -83,7 +83,7 @@ try {
     $configuredCount = 1
     if (Test-Path -LiteralPath $settingsPath) {
         [xml]$settings = Get-Content -LiteralPath $settingsPath -Raw
-        $configuredCount = [Math]::Max(1, [Math]::Min(4, [int]$settings.vdd_settings.monitors.count))
+        $configuredCount = 1
     }
     # Enumerate the Windows display device names and bounds used by native capture.
     Add-Type @'

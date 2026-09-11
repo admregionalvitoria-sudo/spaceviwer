@@ -122,14 +122,17 @@ export async function refreshHostCapture() {
   return result(await nativeRequest('POST', '/api/refresh-capture', {}));
 }
 async function applyCount(count: number) {
-  if (!Number.isInteger(count) || count < 0 || count > 4) return { success: false, count: (await getVirtualDisplayState()).count, error: 'Escolha de 0 a 4 telas virtuais.' };
-  const changed = await changeVirtualDisplays(count === 0 ? 'disable' : 'set-count', Math.max(1, count));
-  if (changed.success) await refreshHostCapture();
+  const targetCount = count <= 0 ? 0 : 1;
+  const changed = await changeVirtualDisplays(targetCount === 0 ? 'disable' : 'set-count', Math.max(1, targetCount));
+  if (changed.success) {
+    await refreshHostCapture();
+    await syncAllSessionsToVirtualDisplay().catch(() => {});
+  }
   return { ...changed, count: (await getVirtualDisplayState()).count };
 }
-export function setVirtualDisplayCount(count: number) { return queue(() => applyCount(count)); }
-export function addVirtualDisplay() { return queue(async () => applyCount((await getVirtualDisplayState()).count + 1)); }
-export function removeVirtualDisplay() { return queue(async () => applyCount(Math.max(0, (await getVirtualDisplayState()).count - 1))); }
+export function setVirtualDisplayCount(count: number) { return queue(() => applyCount(count > 0 ? 1 : 0)); }
+export function addVirtualDisplay() { return queue(async () => applyCount(1)); }
+export function removeVirtualDisplay() { return queue(async () => applyCount(0)); }
 export function toggleVirtualDisplays(enabled: boolean) { return queue(async () => { const res = await changeVirtualDisplays(enabled ? 'enable' : 'disable'); if (res.success) await refreshHostCapture(); return res; }); }
 export function installVirtualDisplayDriver() { return queue(async () => { const res = await changeVirtualDisplays('install'); if (res.success) await refreshHostCapture(); return res; }); }
 export function removeVirtualDisplayDriver() { return queue(async () => { const res = await changeVirtualDisplays('remove'); if (res.success) await refreshHostCapture(); return res; }); }
@@ -161,6 +164,19 @@ export function setHostSettings(settings: Partial<HostSettings>) {
   settingsQueue = next.catch(() => {});
   return next;
 }
+export async function syncAllSessionsToVirtualDisplay(): Promise<void> {
+  const monitors = await getHostDisplays();
+  const virtualDisplay = monitors.find((m) => m.virtual);
+  const target = virtualDisplay || monitors.find((m) => !m.primary) || monitors[0];
+  if (!target) return;
+  const sessions = await getNativeSessions();
+  for (const session of sessions) {
+    if (session.display !== target.index) {
+      await setNativeSessionDisplay(session.address, target.index).catch(() => {});
+    }
+  }
+}
+
 export async function setMoonlightScreen(sourceId: string, sources: ScreenSource[] = []) {
   const source = sources.find((s) => s.id === sourceId && s.id.startsWith('screen:'));
   const display = screen.getAllDisplays().find((d) => String(d.id) === source?.displayId);
@@ -168,7 +184,14 @@ export async function setMoonlightScreen(sourceId: string, sources: ScreenSource
   const native = matchWindowsDisplay(display, (await getWindowsDisplayInventory()).displays);
   const target = native && (await getHostDisplays()).find((d) => d.deviceName.toLowerCase() === native.deviceName.toLowerCase());
   if (!target) return { success: false, error: 'O servidor ainda não reconheceu esta tela.' };
-  return setHostSettings({ display: target.index, virtualDisplay: target.virtual });
+  const res = await setHostSettings({ display: target.index, virtualDisplay: target.virtual });
+  if (res.success) {
+    const sessions = await getNativeSessions();
+    for (const session of sessions) {
+      await setNativeSessionDisplay(session.address, target.index).catch(() => {});
+    }
+  }
+  return res;
 }
 export async function pairMoonlightPin(pin: string) {
   if (!/^\d{4}$/.test(pin.trim())) return { success: false, error: 'Informe os quatro dígitos exibidos na TV.' };
@@ -195,10 +218,21 @@ export async function getStreamStats(): Promise<SunshineStreamStats> {
 export function startPairingWatcher(callback: (info: { name?: string }) => void) {
   if (pairingTimer) return;
   let polling = false;
-  pairingTimer = setInterval(async () => { if (polling) return; polling = true; try {
-    const response = await nativeStatus(); const waiting = response.status === 200 && Boolean(response.data?.pairingWaiting);
-    if (waiting && !pairingWaiting) callback({ name: 'Smart TV / Moonlight' }); pairingWaiting = waiting;
-  } finally { polling = false; } }, 1000);
+  pairingTimer = setInterval(async () => {
+    if (polling) return;
+    polling = true;
+    try {
+      const response = await nativeStatus();
+      const waiting = response.status === 200 && Boolean(response.data?.pairingWaiting);
+      if (waiting && !pairingWaiting) callback({ name: 'Smart TV / Moonlight' });
+      pairingWaiting = waiting;
+      if (response.status === 200) {
+        await syncAllSessionsToVirtualDisplay().catch(() => {});
+      }
+    } finally {
+      polling = false;
+    }
+  }, 1000);
 }
 export function stopPairingWatcher() { if (pairingTimer) clearInterval(pairingTimer); pairingTimer = null; pairingWaiting = false; }
 // Retained IPC aliases keep existing renderer callers compatible; no Sunshine runtime is used.

@@ -37,29 +37,32 @@ export function TVAssignments() {
     finally { setBusy(''); }
   };
   const monitorName = (display: HostDisplayInfo) => {
-    const slot = displays.filter(item => item.virtual).findIndex(item => item.index === display.index);
-    return display.virtual ? `Tela virtual ${slot + 1}` : `${display.primary ? 'PC principal' : display.name} (física)`;
+    return display.virtual ? 'Tela virtual (Espelhada no Moonlight)' : `${display.primary ? 'PC principal' : display.name} (física)`;
   };
   return <GlassCard className="p-5 space-y-4 shrink-0 text-neutral-900">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h3 className="font-bold text-sm">Telas independentes e áudio nas TVs</h3>
-        <p className="text-xs text-neutral-600 mt-1">Use telas estendidas para mostrar conteúdos diferentes e continuar usando o PC.</p></div>
-      <button disabled={!!busy} className="border rounded-lg px-3 py-2 text-xs disabled:opacity-50"
+      <div><h3 className="font-bold text-sm">Espelhamento das TVs (Moonlight)</h3>
+        <p className="text-xs text-neutral-600 mt-1">Todas as TVs conectadas exibem a mesma Tela Virtual, reduzindo o uso da GPU e o tráfego da rede.</p></div>
+      <button disabled={!!busy} className="border rounded-lg px-3 py-2 text-xs font-mono font-bold uppercase disabled:opacity-50 hover:bg-neutral-100 transition cursor-pointer"
         onClick={() => run('screens', async () => {
           const state = await window.screenflow.getVirtualDisplayState();
-          const count = await window.screenflow.setVirtualDisplayCount(Math.min(4, Math.max(2, state.count || 0, sessions.length)));
-          if (!count.success) return count;
+          if (!state.enabled) {
+            const enable = await window.screenflow.toggleVirtualDisplays(true);
+            if (!enable.success) return enable;
+          }
           const mode = await window.screenflow.setDisplayMode('extended');
           if (!mode.success) return mode;
-          const monitors = (await window.screenflow.getHostDisplays()).filter(item => item.virtual);
-          const connections = await window.screenflow.getNativeSessions();
-          for (let index=0; index<connections.length; index++) {
-            if (!monitors[index]) return { success: false, error: 'O Windows ainda não disponibilizou todas as telas virtuais.' };
-            const assignment = await window.screenflow.setNativeSessionDisplay(connections[index].address, monitors[index].index);
-            if (!assignment.success) return assignment;
+          const monitors = await window.screenflow.getHostDisplays();
+          const virtual = monitors.find(item => item.virtual) || monitors[0];
+          if (virtual) {
+            const connections = await window.screenflow.getNativeSessions();
+            for (const connection of connections) {
+              const assignment = await window.screenflow.setNativeSessionDisplay(connection.address, virtual.index);
+              if (!assignment.success) return assignment;
+            }
           }
           return { success: true };
-        })}>Preparar duas telas virtuais</button>
+        })}>Sincronizar Espelhamento</button>
     </div>
     <div className="text-xs space-y-2">
       <button disabled={!!busy || !sessions.length || !audio.installed} className="rounded-lg px-3 py-2 bg-neutral-900 text-white disabled:opacity-50"
@@ -70,16 +73,22 @@ export function TVAssignments() {
           }
           return { success: true };
         })}>Mesmo áudio em todas as TVs</button>
-      <p className="text-neutral-600">O modo compartilhado envia o som do Windows para todas as TVs ativadas. As imagens continuam independentes.</p>
+      <p className="text-neutral-600">O modo compartilhado envia o som do Windows para todas as TVs ativadas em perfeita sincronia com o vídeo espelhado.</p>
     </div>
-    {!sessions.length && <p className="text-xs text-neutral-500">Conecte as TVs pelo Moonlight. Cada conexão aparecerá aqui com sua tela e seu áudio.</p>}
+    {!sessions.length && <p className="text-xs text-neutral-500">Conecte as TVs pelo Moonlight. Todas as conexões exibirão a mesma tela virtual automaticamente.</p>}
     {sessions.map(session => <div key={session.address} className="border rounded-xl p-4 space-y-3 bg-white/60">
       <div className="flex justify-between gap-2"><strong className="text-xs">TV · {session.address}</strong>
-        <span className="text-xs text-neutral-500">{session.display < 0 ? 'Aguardando a tela atribuída' : session.displayKey?.startsWith('virtual:') ? 'Área de trabalho independente' : 'Monitor físico'}</span></div>
+        <span className="text-xs text-neutral-500">{session.display < 0 ? 'Aguardando a tela atribuída' : 'Espelhamento Unificado'}</span></div>
       <div className="grid sm:grid-cols-2 gap-3">
-        <label className="text-xs space-y-1 block"><span>Tela desta TV</span>
+        <label className="text-xs space-y-1 block"><span>Tela transmitida (espelhada para todas as TVs)</span>
           <select className="w-full rounded-lg border p-2 bg-white" aria-label={`Tela da TV ${session.address}`}
-            value={session.display} disabled={!!busy} onChange={event => run(session.address, () => window.screenflow.setNativeSessionDisplay(session.address, Number(event.target.value)))}>
+            value={session.display} disabled={!!busy} onChange={event => run('change-screen-all', async () => {
+              const targetDisplay = Number(event.target.value);
+              for (const s of sessions) {
+                await window.screenflow.setNativeSessionDisplay(s.address, targetDisplay);
+              }
+              return { success: true };
+            })}>
             {session.display < 0 && <option value={-1}>Tela indisponível — crie ou escolha uma tela</option>}
             {displays.map(display => <option key={display.index} value={display.index}>{monitorName(display)}</option>)}
           </select>

@@ -82,16 +82,31 @@ test('last virtual display is disabled and returned count comes from Windows', a
 });
 
 test('failed removal never reports a lower count or success', async () => {
-  const { api } = hostFixture({ count: 2, driverFailure: true });
+  const { api } = hostFixture({ count: 1, driverFailure: true });
   const result = await api.removeVirtualDisplay();
   assert.equal(result.success, false);
-  assert.equal(result.count, 2);
+  assert.equal(result.count, 1);
 });
 
 test('concurrent removal requests read the updated device state in sequence', async () => {
-  const { api } = hostFixture({ count: 2 });
+  const { api } = hostFixture({ count: 1 });
   const results = await Promise.all([api.removeVirtualDisplay(), api.removeVirtualDisplay()]);
-  assert.deepEqual(results.map((r) => r.count), [1, 0]);
+  assert.deepEqual(results.map((r) => r.count), [0, 0]);
+});
+
+test('sessions are synchronized to the single virtual display for unified mirroring', async () => {
+  const { api, calls } = hostFixture({
+    responses: {
+      '/api/status': { active: true, hostType: 'SpaceViewer', apiVersion: 2 },
+      '/api/sessions': { sessions: [{ address: '192.168.1.50', display: 0 }, { address: '192.168.1.51', display: 1 }] },
+      '/api/displays': { displays: [{ index: 3, name: 'Virtual', deviceName: '\\\\.\\DISPLAY7', width: 1920, height: 1080, primary: false, virtual: true }] },
+    }
+  });
+  await api.syncAllSessionsToVirtualDisplay();
+  const sessionPosts = calls.filter(c => c.path === '/api/session-display');
+  assert.equal(sessionPosts.length, 2);
+  assert.equal(new URLSearchParams(sessionPosts[0].body).get('display'), '3');
+  assert.equal(new URLSearchParams(sessionPosts[1].body).get('display'), '3');
 });
 
 test('capture source identifier is resolved through display_id and native device name', async () => {

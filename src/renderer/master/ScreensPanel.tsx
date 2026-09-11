@@ -479,14 +479,14 @@ export const ScreensPanel: React.FC = () => {
                 </svg>
               </div>
               <h3 className="font-display font-black text-lg text-neutral-900 tracking-tight uppercase">
-                Telas Virtuais (SpaceviwerStream)
+                Tela Virtual Única (Moonlight)
               </h3>
 
               {/* Status Badge */}
               {virtualState.enabled && (virtualState.active || virtualCount > 0) ? (
                 <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Ativo • {virtualCount} {virtualCount === 1 ? 'tela virtual' : 'telas virtuais'} no Windows</span>
+                  <span>1 Tela Virtual Ativa • Espelhada no Moonlight</span>
                 </span>
               ) : (
                 <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-neutral-100 text-neutral-600 border border-neutral-250">
@@ -497,44 +497,16 @@ export const ScreensPanel: React.FC = () => {
             </div>
 
             <p className="text-xs text-neutral-600 leading-relaxed">
-              Adicione ou remova telas virtuais dinamicamente. Cada tela virtual criada pode ser selecionada para transmissão no Moonlight (Smart TV). Quando terminar, desative-as para liberar sua placa de vídeo e o cursor.
+              Modo otimizado com 1 única tela virtual estendida. Todos os dispositivos conectados no Moonlight espelham automaticamente esta mesma tela, economizando processamento da GPU e estabilizando a rede.
             </p>
           </div>
 
-          {/* Controls Bar: Add, Remove, Toggle */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">
-            {/* Stepper Buttons (- and +) */}
-            <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-neutral-250 shadow-2xs">
-              <button
-                onClick={handleRemoveVirtualDisplay}
-                disabled={isUpdatingVirtual || (!virtualState.enabled && virtualCount === 0)}
-                className="px-3.5 py-2 text-xs font-mono font-bold rounded-lg bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200 transition cursor-pointer flex items-center space-x-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Remover uma tela virtual"
-              >
-                <svg className="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M20 12H4" />
-                </svg>
-                <span>Remover Tela</span>
-              </button>
-
-              <button
-                onClick={handleAddVirtualDisplay}
-                disabled={isUpdatingVirtual || (virtualState.enabled && virtualState.count >= 4)}
-                className="px-3.5 py-2 text-xs font-mono font-bold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition cursor-pointer flex items-center space-x-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Adicionar uma nova tela virtual"
-              >
-                <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-                </svg>
-                <span>Adicionar Tela</span>
-              </button>
-            </div>
-
-            {/* Toggle Switch Button */}
+          {/* Controls Bar: Single Toggle */}
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => handleToggleVirtualDisplays(!virtualState.enabled)}
               disabled={isUpdatingVirtual}
-              className={`px-4 py-2 text-xs font-mono font-bold uppercase rounded-xl transition cursor-pointer flex items-center space-x-1.5 shadow-sm active:scale-[0.98] ${
+              className={`px-4 py-2.5 text-xs font-mono font-bold uppercase rounded-xl transition cursor-pointer flex items-center space-x-2 shadow-sm active:scale-[0.98] ${
                 virtualState.enabled
                   ? 'bg-neutral-800 hover:bg-neutral-900 text-neutral-100 border border-neutral-700'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white'
@@ -551,7 +523,7 @@ export const ScreensPanel: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               )}
-              <span>{virtualState.enabled ? 'Desativar Telas' : 'Ativar Telas Virtuais'}</span>
+              <span>{virtualState.enabled ? 'Desativar Tela Virtual' : 'Ativar Tela Virtual'}</span>
             </button>
           </div>
         </div>
@@ -1045,27 +1017,27 @@ export const ScreensPanel: React.FC = () => {
             )}
           </div>
 
-          <button
-            onClick={() => {
-              closeContextMenu();
-              handleAddVirtualDisplay();
-            }}
-            disabled={isUpdatingVirtual || (virtualState.enabled && virtualState.count >= 4)}
-            className="w-full text-left px-3 py-2 text-xs font-mono font-bold rounded-xl hover:bg-indigo-50 hover:text-indigo-700 flex items-center space-x-2.5 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <div className="w-5 h-5 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-              </svg>
-            </div>
-            <span>Adicionar Tela Virtual</span>
-          </button>
-
-          {contextMenu.screen?.isVirtual && (
+          {!virtualState.enabled ? (
             <button
               onClick={() => {
                 closeContextMenu();
-                handleRemoveVirtualDisplay();
+                handleToggleVirtualDisplays(true);
+              }}
+              disabled={isUpdatingVirtual}
+              className="w-full text-left px-3 py-2 text-xs font-mono font-bold rounded-xl hover:bg-indigo-50 hover:text-indigo-700 flex items-center space-x-2.5 transition cursor-pointer disabled:opacity-40"
+            >
+              <div className="w-5 h-5 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <span>Ativar Tela Virtual</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                closeContextMenu();
+                handleToggleVirtualDisplays(false);
               }}
               disabled={isUpdatingVirtual}
               className="w-full text-left px-3 py-2 text-xs font-mono font-bold rounded-xl hover:bg-rose-50 hover:text-rose-700 flex items-center space-x-2.5 transition cursor-pointer disabled:opacity-40"
@@ -1075,7 +1047,7 @@ export const ScreensPanel: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </div>
-              <span>Remover Esta Tela</span>
+              <span>Desativar Tela Virtual</span>
             </button>
           )}
 

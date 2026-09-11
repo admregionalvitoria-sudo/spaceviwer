@@ -54,12 +54,12 @@ export function matchWindowsDisplay(display: Electron.Display, inventory: Window
 }
 
 export async function changeVirtualDisplays(action: 'set-count' | 'enable' | 'disable' | 'install' | 'remove', count = 1): Promise<{ success: boolean; error?: string }> {
-  if (!Number.isInteger(count) || count < 1 || count > 4) return { success: false, error: 'Escolha de 1 a 4 telas virtuais.' };
+  const normalizedCount = 1;
   const operation = mutationQueue.then(async () => {
     try {
       // Do not retain a pre-mutation query result after changing the device.
       if (pending) await pending.catch(() => {});
-      await runPowerShell(`& ${psLiteral(managerPath())} -Action ${action} -Count ${count}\nexit $LASTEXITCODE`, true);
+      await runPowerShell(`& ${psLiteral(managerPath())} -Action ${action} -Count ${normalizedCount}\nexit $LASTEXITCODE`, true);
       invalidateDisplayInventory();
       let state = await getWindowsDisplayInventory();
       if ((action === 'disable' && state.enabled) || (action === 'remove' && state.installed) ||
@@ -67,12 +67,12 @@ export async function changeVirtualDisplays(action: 'set-count' | 'enable' | 'di
         throw new Error('O Windows ainda não confirmou a alteração das telas virtuais.');
       }
       if (action === 'set-count') {
-        for (let attempt = 0; attempt < 4 && state.displays.filter((d) => d.isVirtual).length !== count; attempt++) {
+        for (let attempt = 0; attempt < 4 && state.displays.filter((d) => d.isVirtual).length !== normalizedCount; attempt++) {
           await new Promise((resolve) => setTimeout(resolve, 500));
           invalidateDisplayInventory();
           state = await getWindowsDisplayInventory();
         }
-        if (state.displays.filter((d) => d.isVirtual).length !== count) {
+        if (state.displays.filter((d) => d.isVirtual).length !== normalizedCount) {
           throw new Error('O driver recebeu a configuração, mas o Windows ainda não disponibilizou a quantidade solicitada de telas.');
         }
       }
