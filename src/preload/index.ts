@@ -67,6 +67,7 @@ const api: ScreenFlowAPI = {
   setNativeSessionDisplay: (address, display) => ipcRenderer.invoke('set-native-session-display', address, display),
   getHostSettings: () => ipcRenderer.invoke('get-host-settings'),
   setHostSettings: (settings) => ipcRenderer.invoke('set-host-settings', settings),
+  refreshHostCapture: () => ipcRenderer.invoke('refresh-host-capture'),
 
   // === MOONLIGHT — ADVANCED ===
   getMoonlightScreens: () => ipcRenderer.invoke('get-moonlight-screens'),

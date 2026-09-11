@@ -43,7 +43,19 @@ export async function getScreensDetailed(): Promise<DetailedScreenInfo[]> {
     const activeProjectors = getActiveProjectors();
     const [inventory, hostDisplays, settings] = await Promise.all([getWindowsDisplayInventory(), getHostDisplays(), getHostSettings()]);
 
-    return displays.map((disp, idx) => {
+    let seenVirtual = false;
+    const filteredDisplays = displays.filter((disp) => {
+      const isPrimary = disp.id === primaryDisplay.id;
+      if (isPrimary) return true;
+      const native = matchWindowsDisplay(disp, inventory.displays);
+      if (native?.isVirtual) {
+        if (seenVirtual) return false;
+        seenVirtual = true;
+      }
+      return true;
+    });
+
+    return filteredDisplays.map((disp, idx) => {
       const isPrimary = disp.id === primaryDisplay.id;
       const matchedSource = sources.find((s) => s.display_id === String(disp.id));
       const sourceId = matchedSource?.id || '';
@@ -60,8 +72,8 @@ export async function getScreensDetailed(): Promise<DetailedScreenInfo[]> {
       const name = isPrimary
         ? `Tela 1 — Monitor Principal (${resW}×${resH})`
         : isVirtual
-        ? `Tela ${idx + 1} — Monitor Virtual ${idx} (${resW}×${resH})`
-        : `Tela ${idx + 1} — Monitor Secundário (${resW}×${resH})`;
+        ? `Tela 2 — Monitor Virtual Moonlight (${resW}×${resH})`
+        : `Tela ${idx + 1} — Monitor Físico (${resW}×${resH})`;
 
       return {
         id: sourceId,

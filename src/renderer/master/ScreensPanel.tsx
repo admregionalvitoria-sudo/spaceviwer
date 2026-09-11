@@ -771,50 +771,50 @@ export const ScreensPanel: React.FC = () => {
             );
           })}
 
-          {/* Card Interativo: Adicionar Nova Tela Virtual */}
-          <div
-            onClick={() => {
-              if (!isUpdatingVirtual && (!virtualState.enabled || virtualState.count < 4)) {
-                handleAddVirtualDisplay();
-              }
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
-            }}
-            className={`screen-card p-6 flex flex-col items-center justify-center text-center space-y-4 rounded-2xl border-2 border-dashed transition-all duration-300 min-h-[300px] select-none ${
-              isUpdatingVirtual || (virtualState.enabled && virtualState.count >= 4)
-                ? 'border-neutral-250 bg-neutral-50/50 opacity-60 cursor-not-allowed'
-                : 'border-indigo-300 hover:border-indigo-500 bg-gradient-to-b from-indigo-50/40 via-white/80 to-white hover:bg-indigo-50/70 shadow-xs hover:shadow-lg hover:scale-[1.01] cursor-pointer group'
-            }`}
-          >
-            <div className="w-14 h-14 rounded-2xl bg-indigo-600 group-hover:bg-indigo-700 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-all">
-              {isUpdatingVirtual ? (
-                <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-                </svg>
-              )}
-            </div>
+          {/* Card Interativo: Ativar Monitor Virtual Único (Moonlight) */}
+          {virtualCount === 0 && (
+            <div
+              onClick={() => {
+                if (!isUpdatingVirtual) {
+                  handleToggleVirtualDisplays(true);
+                }
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+              }}
+              className={`screen-card p-6 flex flex-col items-center justify-center text-center space-y-4 rounded-2xl border-2 border-dashed transition-all duration-300 min-h-[300px] select-none ${
+                isUpdatingVirtual
+                  ? 'border-neutral-250 bg-neutral-50/50 opacity-60 cursor-not-allowed'
+                  : 'border-indigo-300 hover:border-indigo-500 bg-gradient-to-b from-indigo-50/40 via-white/80 to-white hover:bg-indigo-50/70 shadow-xs hover:shadow-lg hover:scale-[1.01] cursor-pointer group'
+              }`}
+            >
+              <div className="w-14 h-14 rounded-2xl bg-indigo-600 group-hover:bg-indigo-700 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-all">
+                {isUpdatingVirtual ? (
+                  <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                  </svg>
+                )}
+              </div>
 
-            <div className="space-y-1.5">
-              <h3 className="font-display font-black text-base text-neutral-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors flex items-center justify-center space-x-1.5">
-                <span>Adicionar Tela Virtual</span>
-              </h3>
-              <p className="text-xs text-neutral-500 max-w-[220px] leading-relaxed mx-auto">
-                {virtualState.enabled && virtualState.count >= 4
-                  ? 'Limite máximo de 4 telas virtuais atingido no Windows.'
-                  : 'Criar novo monitor virtual no Windows para utilizar ou transmitir no Moonlight.'}
-              </p>
-            </div>
+              <div className="space-y-1.5">
+                <h3 className="font-display font-black text-base text-neutral-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors flex items-center justify-center space-x-1.5">
+                  <span>Ativar Tela Virtual Moonlight</span>
+                </h3>
+                <p className="text-xs text-neutral-500 max-w-[220px] leading-relaxed mx-auto">
+                  Ativar monitor virtual único no Windows para transmissão em tempo real no Moonlight.
+                </p>
+              </div>
 
-            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase bg-indigo-100/80 text-indigo-900 border border-indigo-200">
-              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-              <span>{virtualCount} de 4 Telas Criadas</span>
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase bg-indigo-100/80 text-indigo-900 border border-indigo-200">
+                <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+                <span>Monitor Virtual Único</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

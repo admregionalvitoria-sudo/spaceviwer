@@ -559,6 +559,10 @@ function registerIpcHandlers() {
     return await setHostSettings(settings);
   });
 
+  ipcMain.handle('refresh-host-capture', async () => {
+    return await refreshHostCapture();
+  });
+
   // Moonlight — Screen Selection
   ipcMain.handle('get-moonlight-screens', async () => {
     return await getAvailableScreens();

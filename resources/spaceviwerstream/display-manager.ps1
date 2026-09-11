@@ -31,7 +31,12 @@ try {
             New-Item -ItemType Directory -Path 'C:\VirtualDisplayDriver' -Force | Out-Null
             foreach ($file in @('MttVDD.inf', 'MttVDD.dll', 'mttvdd.cat', 'vdd_settings.xml')) {
                 $target = Join-Path 'C:\VirtualDisplayDriver' $file
-                if (!(Test-Path -LiteralPath $target)) { Copy-Item -LiteralPath (Join-Path $driverDir $file) -Destination $target }
+                Copy-Item -LiteralPath (Join-Path $driverDir $file) -Destination $target -Force
+            }
+            if (Test-Path -LiteralPath $settingsPath) {
+                [xml]$settings = Get-Content -LiteralPath $settingsPath -Raw
+                $settings.vdd_settings.monitors.count = '1'
+                $settings.Save($settingsPath)
             }
         }
         if ($Action -eq 'install' -or (($Action -eq 'enable' -or $Action -eq 'set-count') -and $adapters.Count -eq 0)) {
@@ -46,8 +51,15 @@ try {
             if (!(Test-Path -LiteralPath $settingsPath)) { throw 'Configuracao do driver virtual nao encontrada.' }
             $previousSettings = Get-Content -LiteralPath $settingsPath -Raw
             [xml]$settings = $previousSettings
-            $settings.vdd_settings.monitors.count = [string]$Count
+            $settings.vdd_settings.monitors.count = '1'
             $settings.Save($settingsPath)
+        }
+        # If there are duplicate virtual display adapters in PnP, disable any extras beyond the first
+        if ($adapters.Count -gt 1) {
+            for ($i = 1; $i -lt $adapters.Count; $i++) {
+                try { Invoke-Pnp @('/disable-device', $adapters[$i].PNPDeviceID) } catch {}
+            }
+            $adapters = @($adapters[0])
         }
         foreach ($adapter in $adapters) {
             switch ($Action) {
@@ -55,13 +67,15 @@ try {
                 'remove' { Invoke-Pnp @('/remove-device', $adapter.PNPDeviceID) }
                 default {
                     if ($adapter.ConfigManagerErrorCode -eq 22) { Invoke-Pnp @('/enable-device', $adapter.PNPDeviceID) }
-                    if ($Action -eq 'set-count') { Invoke-Pnp @('/restart-device', $adapter.PNPDeviceID) }
+                    if ($Action -eq 'set-count' -or $Action -eq 'enable') { Invoke-Pnp @('/restart-device', $adapter.PNPDeviceID) }
                 }
             }
         }
         if (@('set-count', 'enable', 'install') -contains $Action) {
             & (Join-Path $PSScriptRoot 'SpaceviwerStreamDisplayCtl.exe') extend | Out-Null
             if ($LASTEXITCODE -ne 0) { throw "Falha ao ativar a area de trabalho estendida (codigo $LASTEXITCODE)." }
+            Start-Sleep -Milliseconds 400
+            & (Join-Path $PSScriptRoot 'SpaceviwerStreamDisplayCtl.exe') mode-virtual 1920 1080 60 | Out-Null
         }
         # Confirm the OS state instead of reporting success from the elevation wrapper.
         $verified = $false

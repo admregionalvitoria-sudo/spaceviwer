@@ -133,17 +133,45 @@ async function applyCount(count: number) {
 export function setVirtualDisplayCount(count: number) { return queue(() => applyCount(count > 0 ? 1 : 0)); }
 export function addVirtualDisplay() { return queue(async () => applyCount(1)); }
 export function removeVirtualDisplay() { return queue(async () => applyCount(0)); }
-export function toggleVirtualDisplays(enabled: boolean) { return queue(async () => { const res = await changeVirtualDisplays(enabled ? 'enable' : 'disable'); if (res.success) await refreshHostCapture(); return res; }); }
+export function toggleVirtualDisplays(enabled: boolean) {
+  return queue(async () => {
+    const res = await changeVirtualDisplays(enabled ? 'enable' : 'disable');
+    if (res.success) {
+      invalidateDisplayInventory();
+      await new Promise((r) => setTimeout(r, 800));
+      await syncAllSessionsToVirtualDisplay().catch(() => {});
+      await refreshHostCapture().catch(() => {});
+    }
+    return res;
+  });
+}
 export function installVirtualDisplayDriver() { return queue(async () => { const res = await changeVirtualDisplays('install'); if (res.success) await refreshHostCapture(); return res; }); }
 export function removeVirtualDisplayDriver() { return queue(async () => { const res = await changeVirtualDisplays('remove'); if (res.success) await refreshHostCapture(); return res; }); }
 export function setDisplayMode(mode: DisplayTopologyMode) {
   return queue(async () => {
     if (mode !== 'extended' && mode !== 'duplicate') return { success: false, error: 'Modo de tela inválido.' };
     const status = await nativeStatus();
-    if (status.status === 200) { const response = await request('POST', '/api/display-mode', { mode: mode === 'extended' ? 'extend' : 'duplicate' }); invalidateDisplayInventory(); return result(response); }
-    if (status.status === 409) return result(status);
-    try { await runPowerShell(`& ${psLiteral(getDisplayCtlExePath())} ${mode === 'extended' ? 'extend' : 'duplicate'}\nexit $LASTEXITCODE`); invalidateDisplayInventory(); return { success: true }; }
-    catch (error) { return { success: false, error: (error as Error).message }; }
+    let res: { success: boolean; error?: string };
+    if (status.status === 200) {
+      const response = await request('POST', '/api/display-mode', { mode: mode === 'extended' ? 'extend' : 'duplicate' });
+      res = result(response);
+    } else if (status.status === 409) {
+      return result(status);
+    } else {
+      try {
+        await runPowerShell(`& ${psLiteral(getDisplayCtlExePath())} ${mode === 'extended' ? 'extend' : 'duplicate'}\nexit $LASTEXITCODE`);
+        res = { success: true };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    }
+    if (res.success) {
+      invalidateDisplayInventory();
+      await new Promise((r) => setTimeout(r, 600));
+      await syncAllSessionsToVirtualDisplay().catch(() => {});
+      await refreshHostCapture().catch(() => {});
+    }
+    return res;
   });
 }
 export async function getHostDisplays(): Promise<HostDisplayInfo[]> {
@@ -151,7 +179,7 @@ export async function getHostDisplays(): Promise<HostDisplayInfo[]> {
   if (response.status === 200 && Array.isArray(response.data?.displays)) return response.data.displays.map((d: any) => ({ index: d.index, name: d.name, deviceName: d.deviceName, width: d.width, height: d.height, primary: Boolean(d.primary), virtual: Boolean(d.virtual) }));
   return (await getWindowsDisplayInventory()).displays.map((d, index) => ({ index, name: d.label, deviceName: d.deviceName, width: d.width, height: d.height, primary: d.primary, virtual: d.isVirtual }));
 }
-const defaultSettings: HostSettings = { display: 0, width: 0, height: 0, fps: 60, bitrateMbps: 20, hardware: true, virtualDisplay: false };
+const defaultSettings: HostSettings = { display: 0, width: 1920, height: 1080, fps: 60, bitrateMbps: 40, hardware: true, virtualDisplay: true };
 export async function getHostSettings(): Promise<HostSettings> {
   const response = await nativeRequest('GET', '/api/settings');
   return response.status === 200 && response.data ? { ...defaultSettings, ...response.data } : { ...defaultSettings };
@@ -159,7 +187,11 @@ export async function getHostSettings(): Promise<HostSettings> {
 export function setHostSettings(settings: Partial<HostSettings>) {
   const next = settingsQueue.then(async () => {
     const merged = { ...await getHostSettings(), ...settings };
-    return result(await nativeRequest('POST', '/api/settings', { ...merged, hardware: merged.hardware ? 1 : 0, virtualDisplay: merged.virtualDisplay ? 1 : 0 }));
+    const res = result(await nativeRequest('POST', '/api/settings', { ...merged, hardware: merged.hardware ? 1 : 0, virtualDisplay: merged.virtualDisplay ? 1 : 0 }));
+    if (res.success) {
+      await refreshHostCapture().catch(() => {});
+    }
+    return res;
   });
   settingsQueue = next.catch(() => {});
   return next;
@@ -171,7 +203,7 @@ export async function syncAllSessionsToVirtualDisplay(): Promise<void> {
   if (!target) return;
   const sessions = await getNativeSessions();
   for (const session of sessions) {
-    if (session.display !== target.index) {
+    if (session.display !== target.index || session.display < 0) {
       await setNativeSessionDisplay(session.address, target.index).catch(() => {});
     }
   }
