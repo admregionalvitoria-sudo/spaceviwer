@@ -63,6 +63,7 @@ import {
 import { AgentServer } from './agent-server';
 import { TVDiscovery } from './tv-discovery';
 import { checkForAppUpdates, downloadAndInstallUpdate, applyUpdateAndRestart } from './updater';
+import { ensureVirtualDisplayCursorVisible } from './cursor-manager';
 import type { AppSettings, InstallMode, MasterInfo } from '../shared/types';
 import { DEFAULT_SETTINGS, APP_VERSION } from '../shared/constants';
 
@@ -563,6 +564,10 @@ function registerIpcHandlers() {
     return await refreshHostCapture();
   });
 
+  ipcMain.handle('ensure-virtual-cursor', async () => {
+    return await ensureVirtualDisplayCursorVisible();
+  });
+
   // Moonlight — Screen Selection
   ipcMain.handle('get-moonlight-screens', async () => {
     return await getAvailableScreens();
@@ -821,6 +826,7 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
     registerIpcHandlers();
     await createWindow();
+    ensureVirtualDisplayCursorVisible().catch(() => {});
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {

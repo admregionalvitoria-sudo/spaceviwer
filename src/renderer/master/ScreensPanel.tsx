@@ -27,6 +27,7 @@ export const ScreensPanel: React.FC = () => {
   });
   const [isUpdatingVirtual, setIsUpdatingVirtual] = useState(false);
   const [activatingVirtual, setActivatingVirtual] = useState(false);
+  const [isSyncingCursor, setIsSyncingCursor] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   // App Selection Modal / Drawer
@@ -141,10 +142,13 @@ export const ScreensPanel: React.FC = () => {
     try {
       const res = await window.screenflow.toggleVirtualDisplays(enable);
       if (res.success) {
+        if (enable) {
+          await window.screenflow.ensureVirtualCursor().catch(() => {});
+        }
         setActionMessage(
           enable
-            ? 'Telas virtuais ativadas no Windows!'
-            : 'Telas virtuais desativadas! O Windows está agora apenas com seu monitor físico.'
+            ? 'Tela virtual ativada e cursor do mouse sincronizado no Windows!'
+            : 'Tela virtual desativada! O Windows está agora apenas com seu monitor físico.'
         );
         await loadScreensData(true);
       } else {
@@ -234,6 +238,24 @@ export const ScreensPanel: React.FC = () => {
       setActionMessage('Erro ao instalar driver virtual.');
     } finally {
       setActivatingVirtual(false);
+      setTimeout(() => setActionMessage(null), 4000);
+    }
+  };
+
+  // Sync Mouse Cursor Visibility on Virtual Display
+  const handleSyncCursor = async () => {
+    setIsSyncingCursor(true);
+    try {
+      const res = await window.screenflow.ensureVirtualCursor();
+      if (res.success) {
+        setActionMessage('Cursor do mouse sincronizado e visível na tela virtual!');
+      } else {
+        setActionMessage(res.error || 'Não foi possível sincronizar o cursor.');
+      }
+    } catch {
+      setActionMessage('Erro ao sincronizar cursor do mouse.');
+    } finally {
+      setIsSyncingCursor(false);
       setTimeout(() => setActionMessage(null), 4000);
     }
   };
@@ -501,8 +523,26 @@ export const ScreensPanel: React.FC = () => {
             </p>
           </div>
 
-          {/* Controls Bar: Single Toggle */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Controls Bar: Toggle and Cursor Sync */}
+          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+            {virtualState.enabled && (
+              <button
+                onClick={handleSyncCursor}
+                disabled={isSyncingCursor}
+                className="px-3.5 py-2.5 text-xs font-mono font-bold uppercase rounded-xl border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-800 transition cursor-pointer flex items-center space-x-1.5 shadow-2xs active:scale-[0.98]"
+                title="Garantir visibilidade imediata do cursor do mouse na tela virtual e nas TVs"
+              >
+                {isSyncingCursor ? (
+                  <div className="w-3.5 h-3.5 border-2 border-neutral-800 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" />
+                  </svg>
+                )}
+                <span>Sincronizar Cursor</span>
+              </button>
+            )}
+
             <button
               onClick={() => handleToggleVirtualDisplays(!virtualState.enabled)}
               disabled={isUpdatingVirtual}

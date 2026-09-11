@@ -339,6 +339,7 @@ export interface ScreenFlowAPI {
   getHostSettings: () => Promise<HostSettings>;
   setHostSettings: (settings: Partial<HostSettings>) => Promise<{ success: boolean; error?: string }>;
   refreshHostCapture: () => Promise<{ success: boolean; error?: string }>;
+  ensureVirtualCursor: () => Promise<{ success: boolean; error?: string }>;
 
   // Screens & Clients
   getMoonlightScreens: () => Promise<ScreenSource[]>;

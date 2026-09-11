@@ -6,6 +6,7 @@ import * as http from 'http';
 import { app, screen } from 'electron';
 import { changeVirtualDisplays, getWindowsDisplayInventory, matchWindowsDisplay, invalidateDisplayInventory } from './windows-displays';
 import { runPowerShell, psLiteral } from './windows-powershell';
+import { ensureVirtualDisplayCursorVisible } from './cursor-manager';
 import type { NativeSession, NativeAudioStatus, SunshineStatus, DisplayTopologyMode, HostDisplayInfo, HostSettings, VirtualDisplayState, VirtualDisplayStatus, MoonlightClient, SunshineStreamStats, SunshineConfig, ScreenSource } from '../shared/types';
 
 let hostProcess: ChildProcess | null = null;
@@ -83,7 +84,10 @@ export function startHost(): Promise<boolean> {
     child.on('exit', () => { if (hostProcess === child) hostProcess = null; });
     for (let attempt = 0; attempt < 30; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 200));
-      if ((await nativeStatus()).status === 200) return true;
+      if ((await nativeStatus()).status === 200) {
+        ensureVirtualDisplayCursorVisible().catch(() => {});
+        return true;
+      }
       if (child.exitCode !== null || !hostProcess) break;
     }
     child.kill();
@@ -125,6 +129,7 @@ async function applyCount(count: number) {
   const targetCount = count <= 0 ? 0 : 1;
   const changed = await changeVirtualDisplays(targetCount === 0 ? 'disable' : 'set-count', Math.max(1, targetCount));
   if (changed.success) {
+    if (targetCount > 0) ensureVirtualDisplayCursorVisible().catch(() => {});
     await refreshHostCapture();
     await syncAllSessionsToVirtualDisplay().catch(() => {});
   }
@@ -137,6 +142,7 @@ export function toggleVirtualDisplays(enabled: boolean) {
   return queue(async () => {
     const res = await changeVirtualDisplays(enabled ? 'enable' : 'disable');
     if (res.success) {
+      if (enabled) ensureVirtualDisplayCursorVisible().catch(() => {});
       invalidateDisplayInventory();
       await new Promise((r) => setTimeout(r, 800));
       await syncAllSessionsToVirtualDisplay().catch(() => {});
@@ -145,7 +151,7 @@ export function toggleVirtualDisplays(enabled: boolean) {
     return res;
   });
 }
-export function installVirtualDisplayDriver() { return queue(async () => { const res = await changeVirtualDisplays('install'); if (res.success) await refreshHostCapture(); return res; }); }
+export function installVirtualDisplayDriver() { return queue(async () => { const res = await changeVirtualDisplays('install'); if (res.success) { ensureVirtualDisplayCursorVisible().catch(() => {}); await refreshHostCapture(); } return res; }); }
 export function removeVirtualDisplayDriver() { return queue(async () => { const res = await changeVirtualDisplays('remove'); if (res.success) await refreshHostCapture(); return res; }); }
 export function setDisplayMode(mode: DisplayTopologyMode) {
   return queue(async () => {
@@ -166,6 +172,7 @@ export function setDisplayMode(mode: DisplayTopologyMode) {
       }
     }
     if (res.success) {
+      ensureVirtualDisplayCursorVisible().catch(() => {});
       invalidateDisplayInventory();
       await new Promise((r) => setTimeout(r, 600));
       await syncAllSessionsToVirtualDisplay().catch(() => {});
@@ -197,6 +204,7 @@ export function setHostSettings(settings: Partial<HostSettings>) {
   return next;
 }
 export async function syncAllSessionsToVirtualDisplay(): Promise<void> {
+  ensureVirtualDisplayCursorVisible().catch(() => {});
   const monitors = await getHostDisplays();
   const virtualDisplay = monitors.find((m) => m.virtual);
   const target = virtualDisplay || monitors.find((m) => !m.primary) || monitors[0];

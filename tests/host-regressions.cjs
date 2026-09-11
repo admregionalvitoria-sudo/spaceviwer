@@ -62,6 +62,9 @@ function hostFixture(options = {}) {
         return '';
       },
     },
+    './cursor-manager': {
+      ensureVirtualDisplayCursorVisible: async () => ({ success: true }),
+    },
     child_process: { spawn: () => { throw new Error('Test must not launch a real host'); }, exec: () => {} },
   };
   const code = ts.transpileModule(fs.readFileSync(path.join(root, 'src/main/gamestream-host.ts'), 'utf8'), {

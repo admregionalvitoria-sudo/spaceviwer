@@ -82,6 +82,19 @@ try {
             if ($LASTEXITCODE -ne 0) { throw "Falha ao ativar a area de trabalho estendida (codigo $LASTEXITCODE)." }
             Start-Sleep -Milliseconds 400
             & (Join-Path $PSScriptRoot 'SpaceviwerStreamDisplayCtl.exe') mode-virtual 1920 1080 60 | Out-Null
+            try {
+                $cursorDef = @'
+using System;
+using System.Runtime.InteropServices;
+public class WinUserCursorPS {
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
+}
+'@
+                Add-Type -TypeDefinition $cursorDef -ErrorAction SilentlyContinue
+                [WinUserCursorPS]::SystemParametersInfo(0x005D, 2, [IntPtr]::Zero, 3) | Out-Null
+                Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name MouseTrails -Value 2 -ErrorAction SilentlyContinue
+            } catch {}
         }
         # Confirm the OS state instead of reporting success from the elevation wrapper.
         $verified = $false

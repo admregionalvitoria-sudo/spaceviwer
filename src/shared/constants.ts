@@ -6,7 +6,7 @@
 import type { AppSettings, StreamConfig } from './types';
 
 export const APP_NAME = 'SpaceViewer';
-export const APP_VERSION = '2.2.20';
+export const APP_VERSION = '2.2.21';
 export const DEFAULT_PORT = 7523;
 
 // Moonlight / GameStream protocol

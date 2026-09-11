@@ -68,6 +68,7 @@ const api: ScreenFlowAPI = {
   getHostSettings: () => ipcRenderer.invoke('get-host-settings'),
   setHostSettings: (settings) => ipcRenderer.invoke('set-host-settings', settings),
   refreshHostCapture: () => ipcRenderer.invoke('refresh-host-capture'),
+  ensureVirtualCursor: () => ipcRenderer.invoke('ensure-virtual-cursor'),
 
   // === MOONLIGHT — ADVANCED ===
   getMoonlightScreens: () => ipcRenderer.invoke('get-moonlight-screens'),
