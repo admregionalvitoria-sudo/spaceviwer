@@ -1,0 +1,53 @@
+name: Build and Release SpaceViewer
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Publish Windows Executable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Verify native binaries & dependencies
+        run: npm run build:native
+
+      - name: Run host regression tests
+        run: npm run test:host
+
+      - name: Compile application bundle
+        run: npm run build
+
+      - name: Build Windows installer & publish release to GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish always
+
+      - name: Upload installer artifact to GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpaceViewer-Windows-Installer
+          path: dist-package/*.exe
+          if-no-files-found: error

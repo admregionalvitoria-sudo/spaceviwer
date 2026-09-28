@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GlassCard } from './ui/GlassCard';
-import type { NativeSession, HostDisplayInfo, HostSettings } from '../../shared/types';
+import type { NativeSession, HostDisplayInfo, HostSettings, NativeAudioStatus } from '../../shared/types';
 
 /** Shared TV controls shown alongside monitor and Moonlight management. */
 export function TVAssignments() {
   const [sessions, setSessions] = useState<NativeSession[]>([]);
   const [displays, setDisplays] = useState<HostDisplayInfo[]>([]);
+  const [audioStatus, setAudioStatus] = useState<NativeAudioStatus>({
+    installed: false,
+    redirected: false,
+  });
   const [hostSettings, setHostSettingsState] = useState<HostSettings>({
     display: 0,
     width: 1920,
@@ -24,15 +28,17 @@ export function TVAssignments() {
     if (polling.current) return;
     polling.current = true;
     try {
-      const [clients, monitors, settings] = await Promise.all([
+      const [clients, monitors, settings, audio] = await Promise.all([
         window.screenflow.getNativeSessions(),
         window.screenflow.getHostDisplays(),
         window.screenflow.getHostSettings(),
+        window.screenflow.getNativeAudioStatus(),
       ]);
       if (mounted.current) {
         setSessions(clients);
         setDisplays(monitors);
         if (settings) setHostSettingsState(settings);
+        if (audio) setAudioStatus(audio);
       }
     } finally {
       polling.current = false;
@@ -210,6 +216,49 @@ export function TVAssignments() {
         </p>
       </div>
 
+      {/* Status do Driver de Áudio Virtual & Sincronização */}
+      {!audioStatus.installed ? (
+        <div className="border border-amber-300 bg-amber-50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-950">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <span className="text-base">⚠️</span>
+              <strong className="text-xs font-bold uppercase tracking-wide">
+                Driver de Áudio Virtual Necessário para as TVs
+              </strong>
+            </div>
+            <p className="text-xs text-amber-800">
+              Para sair o áudio sincronizado com a imagem na TV pelo Moonlight, instale o driver de áudio virtual (VB-CABLE).
+              Você também pode executar o arquivo <span className="font-mono font-bold">INSTALAR_DRIVER_AUDIO.bat</span> como Administrador.
+            </p>
+          </div>
+          <button
+            disabled={!!busy}
+            onClick={() =>
+              run('install-audio', async () => {
+                const res = await window.screenflow.installNativeAudio();
+                if (!res.success) {
+                  return { success: false, error: res.error || 'Falha ao instalar driver de áudio. Execute INSTALAR_DRIVER_AUDIO.bat como Administrador.' };
+                }
+                return { success: true };
+              })
+            }
+            className="shrink-0 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-sm"
+          >
+            {busy === 'install-audio' ? 'Instalando Driver…' : 'Instalar Driver de Áudio (1 Clique)'}
+          </button>
+        </div>
+      ) : (
+        <div className="border border-emerald-200 bg-emerald-50/70 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs text-emerald-900">
+          <div className="flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+            <span className="font-semibold">Áudio Virtual Ativo — Som do Windows Sincronizado para as TVs</span>
+          </div>
+          <span className="font-mono text-[11px] text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded font-medium">
+            {audioStatus.redirected ? 'Redirecionando áudio para TVs' : 'WASAPI Loopback Pronto'}
+          </span>
+        </div>
+      )}
+
       {!sessions.length && (
         <p className="text-xs text-neutral-500">
           Conecte as TVs pelo Moonlight. Todas as conexões exibirão a mesma tela virtual e reproduzirão o áudio do Windows automaticamente.
@@ -222,7 +271,7 @@ export function TVAssignments() {
           <div className="flex justify-between gap-2 items-center">
             <strong className="text-xs font-mono font-bold">TV · {session.address}</strong>
             <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-              {session.display < 0 ? 'Aguardando tela' : 'Espelhamento & Áudio Unificados'}
+              {session.display < 0 ? 'Aguardando tela' : 'Espelhamento & Áudio Sincronizado'}
             </span>
           </div>
 
@@ -254,9 +303,20 @@ export function TVAssignments() {
             </label>
           </div>
 
-          <p className="text-xs text-neutral-600">
-            Áudio do Windows unificado e sincronizado em tempo real para todas as TVs.
-          </p>
+          {session.audioError && (
+            <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5">
+              ⚠️ Problema no áudio da TV: {session.audioError}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between text-xs text-neutral-600">
+            <span>Áudio do Windows unificado e sincronizado em tempo real para esta TV.</span>
+            {session.audioPackets > 0 && (
+              <span className="font-mono text-[10px] text-neutral-500">
+                {session.audioPackets} pacotes Opus
+              </span>
+            )}
+          </div>
         </div>
       ))}
 

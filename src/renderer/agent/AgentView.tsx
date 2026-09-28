@@ -1,7 +1,6 @@
 // SpaceViewer v2.2.9
 import React, { useEffect, useRef, useState } from 'react';
 import { useAgentStore } from '../stores/agentStore';
-import { createVolumeController } from '../../shared/webrtc/audio';
 
 interface AgentViewProps {
   onDisconnect: () => void;
@@ -11,52 +10,69 @@ interface AgentViewProps {
 export const AgentView: React.FC<AgentViewProps> = ({ onDisconnect, onChangeScreen }) => {
   const { incomingStream, volume, setVolume, fullscreen, setFullscreen, streamStats } = useAgentStore();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const volumeControllerRef = useRef<any>(null);
+  const [isAudioBlocked, setIsAudioBlocked] = useState(false);
   const [showToolbar, setShowToolbar] = useState(true);
   const toolbarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Bind media stream
+  // Bind media stream and setup native synchronized audio playback
   useEffect(() => {
-    if (videoRef.current && incomingStream) {
-      videoRef.current.srcObject = incomingStream;
-      console.log('[AgentView] MediaStream bound to video element', incomingStream.getTracks());
-      
-      // Explicitly trigger play to prevent black screen (autoplay restriction workaround)
-      videoRef.current.play().catch((err) => {
-        console.error('[AgentView] Error playing video stream:', err);
-      });
-      
-      // Setup audio volume controller if audio track exists
-      const audioTracks = incomingStream.getAudioTracks();
-      if (audioTracks.length > 0) {
-        console.log('[AgentView] Audio tracks found, configuring volume controller');
-        try {
-          if (volumeControllerRef.current) {
-            volumeControllerRef.current.destroy();
-          }
-          const controller = createVolumeController(incomingStream);
-          controller.setVolume(volume);
-          volumeControllerRef.current = controller;
-        } catch (err) {
-          console.error('[AgentView] Failed to create volume controller:', err);
-        }
-      }
-    }
+    const video = videoRef.current;
+    if (!video || !incomingStream) return;
 
-    return () => {
-      if (volumeControllerRef.current) {
-        volumeControllerRef.current.destroy();
-        volumeControllerRef.current = null;
-      }
-    };
+    video.srcObject = incomingStream;
+    console.log('[AgentView] MediaStream bound to video element', incomingStream.getTracks());
+
+    // Native audio volume on HTMLVideoElement guarantees hardware A/V lip-sync
+    const normalizedVolume = Math.max(0, Math.min(1, volume / 100));
+    video.volume = normalizedVolume;
+    video.muted = volume === 0;
+
+    // Trigger playback; if blocked by TV/browser autoplay policy, fallback to muted + prompt
+    video.play().catch((err) => {
+      console.warn('[AgentView] Unmuted play failed due to autoplay policy:', err);
+      video.muted = true;
+      setIsAudioBlocked(true);
+      video.play().catch((playErr) => {
+        console.error('[AgentView] Video playback failed:', playErr);
+      });
+    });
   }, [incomingStream]);
 
-  // Adjust volume on the fly
+  // Adjust native volume on the fly
   useEffect(() => {
-    if (volumeControllerRef.current) {
-      volumeControllerRef.current.setVolume(volume);
+    const video = videoRef.current;
+    if (!video) return;
+
+    const normalizedVolume = Math.max(0, Math.min(1, volume / 100));
+    video.volume = normalizedVolume;
+
+    if (volume > 0) {
+      if (isAudioBlocked) {
+        video.muted = false;
+        video.play().then(() => setIsAudioBlocked(false)).catch(() => {
+          video.muted = true;
+        });
+      } else {
+        video.muted = false;
+      }
+    } else {
+      video.muted = true;
     }
-  }, [volume]);
+  }, [volume, isAudioBlocked]);
+
+  const handleUnmute = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = false;
+    const targetVolume = volume > 0 ? volume : 80;
+    if (volume === 0) setVolume(80);
+    video.volume = targetVolume / 100;
+    video.play().then(() => {
+      setIsAudioBlocked(false);
+    }).catch((err) => {
+      console.error('[AgentView] Manual unmute failed:', err);
+    });
+  };
 
   // Toggle fullscreen
   const handleToggleFullscreen = () => {
@@ -90,14 +106,34 @@ export const AgentView: React.FC<AgentViewProps> = ({ onDisconnect, onChangeScre
       className="flex-1 bg-black relative flex items-center justify-center overflow-hidden h-full w-full"
       onMouseMove={handleMouseMove}
     >
-      {/* Video Element (Muted because Audio plays via Web Audio API) */}
+      {/* Native WebRTC Video & Audio Element (Synchronized at hardware/RTP level) */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
-        muted
+        muted={volume === 0 || isAudioBlocked}
         className="w-full h-full object-contain"
       />
+
+      {/* Autoplay restriction fallback banner (Common on Smart TV browsers) */}
+      {isAudioBlocked && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50">
+          <button
+            onClick={handleUnmute}
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-2xl border border-amber-400 transition cursor-pointer transform hover:scale-105 active:scale-95"
+          >
+            <svg className="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+              />
+            </svg>
+            <span>Toque / Clique para Ativar Áudio na TV</span>
+          </button>
+        </div>
+      )}
 
       {/* Stats Overlay (Top-Right) */}
       {streamStats && (

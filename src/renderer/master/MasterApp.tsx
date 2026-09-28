@@ -64,11 +64,18 @@ export const MasterApp: React.FC<MasterAppProps> = ({ onResetMode, canResetMode 
 
     if (streamConfig.audioEnabled && !isWindow) {
       try {
-        console.log('[MasterApp] Attempting desktop audio and video capture for screen:', screenId);
+        console.log('[MasterApp] Attempting low-latency desktop audio and video capture for screen:', screenId);
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             mandatory: {
               chromeMediaSource: 'desktop',
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+              googHighpassFilter: false,
+              googEchoCancellation: false,
+              googAutoGainControl: false,
+              googNoiseSuppression: false,
             },
           } as any,
           video: {
@@ -266,6 +273,12 @@ export const MasterApp: React.FC<MasterAppProps> = ({ onResetMode, canResetMode 
                 const newAudioTrack = newStream.getAudioTracks()[0];
                 if (oldAudioTrack && newAudioTrack) {
                   peer.replaceTrack(oldAudioTrack, newAudioTrack, newStream);
+                } else if (newAudioTrack) {
+                  const pc = (peer as any).peer?._pc;
+                  if (pc) {
+                    const sender = pc.getSenders().find((s: any) => s.track?.kind === 'audio');
+                    sender?.replaceTrack(newAudioTrack);
+                  }
                 }
               }
             } else {
