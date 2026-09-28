@@ -369,6 +369,7 @@ export interface ScreenFlowAPI {
   onUpdateProgress: (cb: (progress: UpdateProgress) => void) => () => void;
 
   // Events
+  onUpdateAvailable: (cb: (info: UpdateInfo) => void) => () => void;
   onScreensChanged: (cb: () => void) => () => void;
   onAgentConnected: (cb: (agent: Agent) => void) => () => void;
   onAgentDisconnected: (cb: (id: string) => void) => () => void;

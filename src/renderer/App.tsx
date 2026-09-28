@@ -1,6 +1,6 @@
 // SpaceViewer v2.2.9
 import React, { useEffect, useState } from 'react';
-import type { InstallMode } from '../shared/types';
+import type { InstallMode, UpdateInfo } from '../shared/types';
 import { APP_VERSION } from '../shared/constants';
 import MasterApp from './master/MasterApp';
 import AgentApp from './agent/AgentApp';
@@ -11,6 +11,10 @@ import neotycUrl from './assets/neotyc.png';
 import nomespaceviewerUrl from './assets/nomespaceviewer.png';
 
 export const App: React.FC = () => {
+  const [autoUpdateInfo, setAutoUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
   // Check if running as a dedicated Projector window (via hash, search, or IPC fallback)
   const urlParams = new URLSearchParams(window.location.search || window.location.hash.replace(/^#\/?/, ''));
   const [projectorData, setProjectorData] = useState<{ sourceId: string; appName: string; displayId?: string } | null>(() => {
@@ -35,6 +39,44 @@ export const App: React.FC = () => {
       });
     }
   }, [projectorData]);
+
+  useEffect(() => {
+    if (!window.screenflow?.onUpdateAvailable) return;
+    const unsub = window.screenflow.onUpdateAvailable((info) => {
+      if (info && info.updateAvailable) {
+        setAutoUpdateInfo(info);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const handleAutoUpdate = async () => {
+    if (!autoUpdateInfo) return;
+    if (!autoUpdateInfo.downloadUrl) {
+      if (autoUpdateInfo.htmlUrl) window.open(autoUpdateInfo.htmlUrl, '_blank');
+      return;
+    }
+    setIsUpdating(true);
+    setUpdateStatus('Baixando atualização...');
+    const unsubProg = window.screenflow.onUpdateProgress((p) => {
+      setUpdateStatus(`Baixando: ${p.percent}% (${(p.speed / (1024 * 1024)).toFixed(1)} MB/s)`);
+    });
+    try {
+      const res = await window.screenflow.downloadAndInstallUpdate(autoUpdateInfo.downloadUrl);
+      unsubProg();
+      if (res.success) {
+        setUpdateStatus('Aplicando e reiniciando...');
+        await window.screenflow.applyUpdateAndRestart();
+      } else {
+        setUpdateStatus(`Erro: ${res.error || 'Falha no download'}`);
+        setIsUpdating(false);
+      }
+    } catch (err: any) {
+      unsubProg();
+      setUpdateStatus(`Erro: ${err.message || 'Falha no download'}`);
+      setIsUpdating(false);
+    }
+  };
 
   if (projectorData) {
     return <ProjectorView sourceId={projectorData.sourceId} appName={projectorData.appName} displayId={projectorData.displayId} />;
@@ -66,10 +108,54 @@ export const App: React.FC = () => {
     }
   };
 
+  const renderUpdateBanner = () => {
+    if (!autoUpdateInfo || !autoUpdateInfo.updateAvailable) return null;
+    return (
+      <div className="fixed top-10 right-6 z-[9999] max-w-sm bg-neutral-900/95 border border-blue-500/40 text-white p-4 rounded-2xl shadow-2xl flex flex-col space-y-2 select-none">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <span className="text-base">🚀</span>
+            <span className="text-xs font-bold font-display uppercase tracking-wider text-blue-400">Nova Atualização Disponível</span>
+          </div>
+          <button
+            onClick={() => setAutoUpdateInfo(null)}
+            className="text-neutral-400 hover:text-white text-xs px-1 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+        <p className="text-[11px] text-neutral-300 leading-snug">
+          A versão <strong>v{autoUpdateInfo.latestVersion}</strong> do SpaceViewer foi lançada no GitHub.
+        </p>
+        {updateStatus && (
+          <div className="text-[10px] font-mono text-blue-300 bg-blue-950/80 border border-blue-800/40 px-2 py-1 rounded">
+            {updateStatus}
+          </div>
+        )}
+        <div className="flex items-center space-x-2 pt-1">
+          <button
+            onClick={handleAutoUpdate}
+            disabled={isUpdating}
+            className="flex-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs shadow transition cursor-pointer text-center"
+          >
+            {isUpdating ? 'Baixando...' : 'Instalar Agora'}
+          </button>
+          <button
+            onClick={() => setAutoUpdateInfo(null)}
+            className="px-2.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs transition cursor-pointer"
+          >
+            Depois
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (!installMode) {
     return (
       <div className="h-screen w-screen flex flex-col justify-between bg-bg-space select-none">
         <TitleBar />
+        {renderUpdateBanner()}
         <div className="flex-1 flex flex-col items-center justify-center space-y-4">
           <div className="w-10 h-10 border-4 border-neutral-200 border-t-neutral-800 rounded-full animate-spin" />
           <span className="font-mono text-xs text-neutral-500 uppercase tracking-wider">A carregar o SpaceViewer...</span>
@@ -82,6 +168,7 @@ export const App: React.FC = () => {
   if (selectedMode === 'master') {
     return (
       <div className="h-screen w-screen flex flex-col overflow-hidden relative">
+        {renderUpdateBanner()}
         <MasterApp
           onResetMode={handleResetMode}
           canResetMode={installMode === 'both'}
@@ -94,6 +181,7 @@ export const App: React.FC = () => {
   if (selectedMode === 'agent') {
     return (
       <div className="h-screen w-screen flex flex-col overflow-hidden relative">
+        {renderUpdateBanner()}
         <AgentApp />
         {/* Float Launcher Button if in BOTH mode */}
         {installMode === 'both' && (
@@ -112,6 +200,7 @@ export const App: React.FC = () => {
   return (
     <div className="h-screen w-screen flex flex-col bg-bg-space text-neutral-900 select-none overflow-hidden relative">
       <TitleBar subtitle="Inicializador" />
+      {renderUpdateBanner()}
 
       {/* Grid Network Design Background */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 space-grid-bg relative">

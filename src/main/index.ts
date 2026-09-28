@@ -799,6 +799,26 @@ function registerIpcHandlers() {
   });
 }
 
+function startAutomaticUpdateChecker() {
+  const check = () => {
+    checkForAppUpdates()
+      .then((info) => {
+        if (info && info.updateAvailable && mainWindow && !mainWindow.isDestroyed()) {
+          console.log('[Updater] Automatic update check: New version available!', info.latestVersion);
+          mainWindow.webContents.send('updater:available-auto', info);
+        }
+      })
+      .catch((err) => {
+        console.error('[Updater] Background check error:', err);
+      });
+  };
+
+  // Initial check 5s after launch
+  setTimeout(check, 5000);
+  // Check every 4 hours
+  setInterval(check, 4 * 60 * 60 * 1000);
+}
+
 // App lifecycle
 let audioRestoredForQuit = false;
 app.on('before-quit', (event) => {
@@ -827,6 +847,9 @@ if (!gotTheLock) {
     registerIpcHandlers();
     await createWindow();
     ensureVirtualDisplayCursorVisible().catch(() => {});
+
+    // Automatic background update check on startup & periodically
+    startAutomaticUpdateChecker();
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {

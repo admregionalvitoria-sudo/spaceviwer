@@ -101,6 +101,11 @@ const api: ScreenFlowAPI = {
   },
 
   // === EVENTS ===
+  onUpdateAvailable: (cb) => {
+    const handler = (_: Electron.IpcRendererEvent, info: unknown) => cb(info as any);
+    ipcRenderer.on('updater:available-auto', handler);
+    return () => ipcRenderer.removeListener('updater:available-auto', handler);
+  },
   onScreensChanged: (cb) => {
     const handler = () => cb();
     ipcRenderer.on('screens-changed', handler);
