@@ -69,7 +69,6 @@ export const MasterApp: React.FC<MasterAppProps> = ({ onResetMode, canResetMode 
           audio: {
             mandatory: {
               chromeMediaSource: 'desktop',
-              chromeMediaSourceId: screenId,
             },
           } as any,
           video: {
