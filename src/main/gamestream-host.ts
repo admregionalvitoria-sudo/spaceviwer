@@ -186,7 +186,7 @@ export async function getHostDisplays(): Promise<HostDisplayInfo[]> {
   if (response.status === 200 && Array.isArray(response.data?.displays)) return response.data.displays.map((d: any) => ({ index: d.index, name: d.name, deviceName: d.deviceName, width: d.width, height: d.height, primary: Boolean(d.primary), virtual: Boolean(d.virtual) }));
   return (await getWindowsDisplayInventory()).displays.map((d, index) => ({ index, name: d.label, deviceName: d.deviceName, width: d.width, height: d.height, primary: d.primary, virtual: d.isVirtual }));
 }
-const defaultSettings: HostSettings = { display: 0, width: 1920, height: 1080, fps: 60, bitrateMbps: 40, hardware: true, virtualDisplay: true };
+const defaultSettings: HostSettings = { display: 0, width: 1920, height: 1080, fps: 60, bitrateMbps: 20, hardware: true, virtualDisplay: true };
 export async function getHostSettings(): Promise<HostSettings> {
   const response = await nativeRequest('GET', '/api/settings');
   return response.status === 200 && response.data ? { ...defaultSettings, ...response.data } : { ...defaultSettings };

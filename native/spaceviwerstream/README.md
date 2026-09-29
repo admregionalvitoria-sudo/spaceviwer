@@ -30,7 +30,7 @@ The installer creates inbound Windows Firewall rules for these ports for local-s
 
 ## Low-latency profile
 
-Live H.264 enables the Media Foundation low-latency and real-time codec properties, requests low-delay rate control with no B-frame reordering, prioritizes encoding speed, and runs the video producer at high thread priority. Capture-to-NV12 conversion has dedicated equal-size and cached scaling paths. For a balanced phone test, start with 1920x1080, 60 FPS, hardware encoding, and 20 Mbps; raise bitrate only after latency is stable.
+Live H.264 enables the Media Foundation low-latency and real-time codec properties, requests low-delay rate control with no B-frame reordering, prioritizes encoding speed, and runs the video producer at high thread priority. Capture-to-NV12 conversion has dedicated equal-size and cached scaling paths, and reuses the output image allocation across live frames. For Wi-Fi, start with 1920x1080, 60 FPS, hardware encoding, and 20 Mbps; if frames still stall, try 15 Mbps. Increase bitrate gradually only while the stream remains stable. A 5 GHz or 6 GHz access point with a strong signal is recommended; the 20 Mbps default is aimed at 1080p and may reduce detail at 4K.
 
 ## Build
 

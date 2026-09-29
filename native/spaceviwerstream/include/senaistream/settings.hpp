@@ -18,7 +18,7 @@ namespace senaistream {
     std::uint32_t width {};  ///< Override width, or zero to use the client request.
     std::uint32_t height {};  ///< Override height, or zero to use the client request.
     std::uint32_t frames_per_second {};  ///< Override FPS, or zero to use the client request.
-    std::uint32_t bitrate_bps {30'000'000};  ///< Target compressed-video bitrate.
+    std::uint32_t bitrate_bps {20'000'000};  ///< Target compressed-video bitrate for stable 1080p Wi-Fi streaming.
     VideoCodec codec {VideoCodec::h264};  ///< Preferred video codec.
     bool prefer_hardware {true};  ///< Whether hardware transforms are attempted first.
     bool prefer_virtual_display {true};  ///< Whether a detected virtual monitor overrides the selected physical output.

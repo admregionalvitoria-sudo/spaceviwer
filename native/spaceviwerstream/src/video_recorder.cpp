@@ -458,17 +458,18 @@ namespace {
    * @param source_height Source height.
    * @param output_width Destination width.
    * @param output_height Destination height.
-   * @return Tightly packed NV12 image.
+   * @param nv12 Receives the tightly packed NV12 image. Its allocation is reused.
    */
-  std::vector<std::uint8_t> bgra_to_nv12(
+  void bgra_to_nv12(
     std::span<const std::byte> bgra,
     std::uint32_t source_width,
     std::uint32_t source_height,
     std::uint32_t output_width,
-    std::uint32_t output_height
+    std::uint32_t output_height,
+    std::vector<std::uint8_t> &nv12
   ) {
     const auto luma_size = static_cast<std::size_t>(output_width) * output_height;
-    std::vector<std::uint8_t> nv12(luma_size + luma_size / 2);
+    nv12.resize(luma_size + luma_size / 2);
     const auto clamp_byte = [](int value) {
       return static_cast<std::uint8_t>(std::clamp(value, 0, 255));
     };
@@ -496,7 +497,7 @@ namespace {
           nv12[chroma_offset + 1] = clamp_byte(((112 * red - 94 * green - 18 * blue + 128) >> 8) + 128);
         }
       }
-      return nv12;
+      return;
     }
 
     /** @brief Cached nearest-neighbor coordinates for the active stream size. */
@@ -550,7 +551,6 @@ namespace {
         nv12[chroma_offset + 1] = clamp_byte(((112 * red - 94 * green - 18 * blue + 128) >> 8) + 128);
       }
     }
-    return nv12;
   }
 
   /**
@@ -1177,6 +1177,7 @@ namespace senaistream {
     const auto frame_duration = 10'000'000LL / config.frames_per_second;
     const auto frame_limit = static_cast<std::uint64_t>(config.duration_seconds) * config.frames_per_second;
     std::vector<std::byte> pixels;
+    std::vector<std::uint8_t> nv12;
     bool have_frame = false;
     const auto start = std::chrono::steady_clock::now();
     for (std::uint64_t frame_index = 0;
@@ -1206,7 +1207,7 @@ namespace senaistream {
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
         continue;
       }
-      const auto nv12 = bgra_to_nv12(pixels, capture.width, capture.height, output_width, output_height);
+      bgra_to_nv12(pixels, capture.width, capture.height, output_width, output_height, nv12);
       if (nv12.size() > std::numeric_limits<DWORD>::max()) {
         return Status::failure("live NV12 frame is too large for Media Foundation");
       }

@@ -1,3 +1,11 @@
+## SpaceViewer 2.2.23
+
+- **Otimização de Desempenho e Reutilização de Buffer NV12**:
+  - Reutilização da alocação de memória do buffer NV12 no loop de captura ao vivo em `video_recorder.cpp`, eliminando alocações repetitivas de buffers por quadro e reduzindo a sobrecarga de CPU/GC.
+- **Estabilidade de Transmissão em Redes Wi-Fi**:
+  - Ajuste do bitrate padrão de transmissão para 20 Mbps (otimizado para streaming 1080p a 60 FPS em Wi-Fi), reduzindo o congestionamento e instabilidade da rede sem fio.
+  - Novas orientações no painel do Moonlight recomendando redes de 5 GHz / 6 GHz e redução preventiva para 15 Mbps caso a TV apresente engasgos.
+
 ## SpaceViewer 2.2.22
 
 - **Sincronização Perfeita de Áudio e Vídeo na TV**:

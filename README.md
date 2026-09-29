@@ -237,6 +237,11 @@ Para assegurar o nível de excelência visual, consistência tipográfica e acab
 
 ## Histórico de Atualizações (Changelog)
 
+### [v2.2.23] — Aprimoramentos de Estabilidade de Transmissão (Wi-Fi e Buffer NV12)
+- Reutilização do buffer NV12 no caminho de vídeo ao vivo para evitar uma nova alocação de imagem a cada quadro.
+- Alinhamento do bitrate padrão com 20 Mbps para streaming 1080p em Wi-Fi, reduzindo a pressão sustentada sobre a rede sem fio.
+- Orientação no painel Moonlight para começar em 1080p/60 FPS/20 Mbps e reduzir para 15 Mbps se houver engasgos; recomenda-se usar a banda de 5 ou 6 GHz.
+
 ### [v2.2.12] — 10 de Setembro de 2026
 - **Inicialização Automática do Host Moonlight**:
   - O servidor GameStream nativo `SpaceviwerStream.exe` agora é iniciado automaticamente no arranque do SpaceViewer sem depender de ação do usuário.

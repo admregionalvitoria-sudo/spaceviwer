@@ -987,9 +987,12 @@ export const MoonlightPanel: React.FC = () => {
                   />
                   <div className="flex justify-between text-[9px] font-mono text-neutral-400">
                     <span>5 Mbps (Leve)</span>
-                    <span>20 Mbps (Recomendado)</span>
+                    <span>20 Mbps (1080p em Wi-Fi)</span>
                     <span>100 Mbps (Ultra)</span>
                   </div>
+                  <p className="text-[10px] leading-relaxed text-neutral-500">
+                    Para TVs e PC no Wi-Fi, comece em 1080p, 60 FPS e 20 Mbps. Use a rede de 5 GHz ou 6 GHz e, se houver engasgos, reduza para 15 Mbps antes de aumentar a qualidade.
+                  </p>
                 </div>
 
                 <div className="flex items-center space-x-3 pt-2">
