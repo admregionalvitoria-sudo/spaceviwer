@@ -268,6 +268,38 @@ async function createWindow() {
     mainWindow = null;
   });
 
+  // Enable F12 (DevTools) and F5 / Ctrl+R (Reload) for easy troubleshooting and recovery
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    if (input.key === 'F12' || (input.control && input.shift && (input.key === 'I' || input.key === 'i'))) {
+      if (mainWindow?.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow?.webContents.openDevTools({ mode: 'detach' });
+      }
+    } else if (input.key === 'F5' || (input.control && (input.key === 'R' || input.key === 'r'))) {
+      mainWindow?.reload();
+    }
+  });
+
+  // Auto-recover if renderer process crashes or hangs
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.warn('[Main] Render process gone:', details);
+    if (!mainWindow?.isDestroyed()) {
+      mainWindow?.reload();
+    }
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('[Main] Window load failed:', errorCode, errorDescription);
+  });
+
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    if (level >= 2) {
+      console.warn(`[Renderer Console] ${message} (${sourceId}:${line})`);
+    }
+  });
+
   // Setup Tray
   setupTray(installMode, mainWindow, {
     onPauseStream: () => {

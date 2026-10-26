@@ -1,3 +1,12 @@
+## SpaceViewer 2.2.25
+
+- **Prevenção Definitiva da Tela Branca (React ErrorBoundary & Safe Renderer)**:
+  - Adicionado componente global `ErrorBoundary` que impede que falhas de renderização desmontem o aplicativo em uma tela sólida branca, exibindo cartão de diagnóstico e botões de recuperação.
+  - Correção de erro `ReferenceError: process is not defined` no modo Agente (`AgentApp.tsx`) ao conectar a um transmissor/master.
+  - Proteção contra valores nulos/indefinidos em `TVAssignments.tsx` durante transições de sessões de vídeo e telas.
+  - Novos atalhos de depuração e recuperação no aplicativo Electron: `F5` / `Ctrl+R` para recarregar a interface e `F12` / `Ctrl+Shift+I` para alternar o DevTools.
+  - Recuperação automática caso o processo de renderização do Chromium seja finalizado ou reiniciado pelo sistema (`render-process-gone`).
+
 ## SpaceViewer 2.2.24
 
 - **Correção de Exceção de Rede mDNS / Bonjour (EADDRNOTAVAIL 224.0.0.251:5353)**:

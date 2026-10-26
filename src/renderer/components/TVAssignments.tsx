@@ -36,8 +36,8 @@ export function TVAssignments() {
         window.screenflow.getNativeAudioStatus(),
       ]);
       if (mounted.current) {
-        setSessions(clients);
-        setDisplays(monitors);
+        setSessions(Array.isArray(clients) ? clients : []);
+        setDisplays(Array.isArray(monitors) ? monitors : []);
         if (settings) setHostSettingsState(settings);
         if (audio) setAudioStatus(audio);
       }
@@ -72,8 +72,9 @@ export function TVAssignments() {
     }
   };
 
-  const monitorName = (display: HostDisplayInfo) => {
-    return display.virtual ? 'Tela virtual única (Moonlight)' : `${display.primary ? 'PC principal' : display.name} (física)`;
+  const monitorName = (display?: HostDisplayInfo) => {
+    if (!display) return 'Monitor desconhecido';
+    return display.virtual ? 'Tela virtual única (Moonlight)' : `${display.primary ? 'PC principal' : display.name || 'Monitor'} (física)`;
   };
 
   const updateQuality = async (updates: Partial<HostSettings>) => {
@@ -261,14 +262,14 @@ export function TVAssignments() {
         </div>
       )}
 
-      {!sessions.length && (
+      {!(sessions?.length) && (
         <p className="text-xs text-neutral-500">
           Conecte as TVs pelo Moonlight. Todas as conexões exibirão a mesma tela virtual e reproduzirão o áudio do Windows automaticamente.
         </p>
       )}
 
       {/* Lista de Sessões Ativas */}
-      {sessions.map((session) => (
+      {(sessions || []).map((session) => (
         <div key={session.address} className="border border-neutral-200 rounded-xl p-4 space-y-3 bg-white/60">
           <div className="flex justify-between gap-2 items-center">
             <strong className="text-xs font-mono font-bold">TV · {session.address}</strong>
@@ -288,7 +289,7 @@ export function TVAssignments() {
                 onChange={(event) =>
                   run('change-screen-all', async () => {
                     const targetDisplay = Number(event.target.value);
-                    for (const s of sessions) {
+                    for (const s of (sessions || [])) {
                       await window.screenflow.setNativeSessionDisplay(s.address, targetDisplay);
                     }
                     return { success: true };
@@ -296,7 +297,7 @@ export function TVAssignments() {
                 }
               >
                 {session.display < 0 && <option value={-1}>Tela indisponível — crie ou escolha uma tela</option>}
-                {displays.map((display) => (
+                {(displays || []).map((display) => (
                   <option key={display.index} value={display.index}>
                     {monitorName(display)}
                   </option>

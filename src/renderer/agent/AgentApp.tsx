@@ -112,8 +112,9 @@ export const AgentApp: React.FC = () => {
       ws.onopen = () => {
         console.log('[AgentApp] Signaling WebSocket opened');
         
-        // Announce our presence as an agent
-        const systemOs = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux';
+        // Announce our presence as an agent (detect OS safely in renderer)
+        const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+        const systemOs = ua.includes('Win') ? 'windows' : ua.includes('Mac') ? 'macos' : 'linux';
         const msg: SignalingMessage = {
           type: 'agent-info',
           payload: {
