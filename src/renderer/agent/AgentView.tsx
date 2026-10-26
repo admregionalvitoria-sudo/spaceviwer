@@ -140,17 +140,17 @@ export const AgentView: React.FC<AgentViewProps> = ({ onDisconnect, onChangeScre
         <div className="absolute top-4 right-4 glass-panel px-4 py-2.5 rounded-xl flex flex-col space-y-1 font-mono text-xs text-neutral-900 pointer-events-none z-30 shadow-md">
           <div className="flex justify-between space-x-6">
             <span className="text-neutral-500">FPS:</span>
-            <span className="font-bold text-neutral-900">{streamStats.fps.toFixed(0)}</span>
+            <span className="font-bold text-neutral-900">{(streamStats?.fps ?? 0).toFixed(0)}</span>
           </div>
           <div className="flex justify-between space-x-6">
             <span className="text-neutral-500">Latência:</span>
-            <span className="font-bold text-neutral-900">{streamStats.latency.toFixed(0)} ms</span>
+            <span className="font-bold text-neutral-900">{(streamStats?.latency ?? 0).toFixed(0)} ms</span>
           </div>
           <div className="flex justify-between space-x-6">
             <span className="text-neutral-500">Banda:</span>
-            <span className="font-bold text-neutral-900">{streamStats.bandwidth.toFixed(2)} Mbps</span>
+            <span className="font-bold text-neutral-900">{(streamStats?.bandwidth ?? 0).toFixed(2)} Mbps</span>
           </div>
-          {streamStats.packetsLost > 0 && (
+          {(streamStats?.packetsLost ?? 0) > 0 && (
             <div className="flex justify-between space-x-6">
               <span className="text-rose-800 font-bold">Perdas:</span>
               <span className="font-bold text-rose-800">{streamStats.packetsLost} pkts</span>

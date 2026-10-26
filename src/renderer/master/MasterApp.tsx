@@ -413,20 +413,20 @@ export const MasterApp: React.FC<MasterAppProps> = ({ onResetMode, canResetMode 
     for (const [id, peer] of peersRef.current.entries()) {
       const stats = await peer.getStats();
       if (stats) {
-        totalBandwidth += stats.bandwidth;
-        totalLatency += stats.latency;
-        totalFps += stats.fps;
+        totalBandwidth += stats.bandwidth || 0;
+        totalLatency += stats.latency || 0;
+        totalFps += stats.fps || 0;
         validCount++;
 
         // Update stats on masterStore for this specific agent card
         updateAgent(id, {
           status: 'streaming',
           metrics: {
-            latency: stats.latency,
-            fps: stats.fps,
-            bandwidth: stats.bandwidth,
-            packetsLost: stats.packetsLost,
-            jitter: stats.jitter,
+            latency: stats.latency || 0,
+            fps: stats.fps || 0,
+            bandwidth: stats.bandwidth || 0,
+            packetsLost: stats.packetsLost || 0,
+            jitter: stats.jitter || 0,
             decodingTime: 0,
           },
         });

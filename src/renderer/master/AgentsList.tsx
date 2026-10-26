@@ -213,15 +213,15 @@ export const AgentsList: React.FC = () => {
                       <div className="grid grid-cols-3 gap-2 bg-neutral-100 border border-neutral-200/60 p-3 rounded-xl font-mono text-[10px]">
                         <div className="flex flex-col items-center">
                           <span className="text-neutral-600 uppercase text-[8px] mb-0.5">Latência</span>
-                          <span className="text-neutral-900 font-bold">{agent.metrics.latency.toFixed(0)} ms</span>
+                          <span className="text-neutral-900 font-bold">{(agent.metrics?.latency ?? 0).toFixed(0)} ms</span>
                         </div>
                         <div className="flex flex-col items-center border-x border-neutral-200">
                           <span className="text-neutral-600 uppercase text-[8px] mb-0.5">FPS Receptor</span>
-                          <span className="text-neutral-900 font-bold">{agent.metrics.fps.toFixed(0)} fps</span>
+                          <span className="text-neutral-900 font-bold">{(agent.metrics?.fps ?? 0).toFixed(0)} fps</span>
                         </div>
                         <div className="flex flex-col items-center">
                           <span className="text-neutral-600 uppercase text-[8px] mb-0.5">Largura Banda</span>
-                          <span className="text-neutral-900 font-bold">{agent.metrics.bandwidth.toFixed(2)} Mbps</span>
+                          <span className="text-neutral-900 font-bold">{(agent.metrics?.bandwidth ?? 0).toFixed(2)} Mbps</span>
                         </div>
                       </div>
 

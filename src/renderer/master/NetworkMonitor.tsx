@@ -25,9 +25,9 @@ export const NetworkMonitor: React.FC = () => {
 
       if (connectedAgents.length > 0) {
         connectedAgents.forEach((agent) => {
-          totalBandwidth += agent.metrics.bandwidth || 0;
-          avgLatency += agent.metrics.latency || 0;
-          avgFps += agent.metrics.fps || 0;
+          totalBandwidth += agent.metrics?.bandwidth || 0;
+          avgLatency += agent.metrics?.latency || 0;
+          avgFps += agent.metrics?.fps || 0;
         });
         avgLatency /= connectedAgents.length;
         avgFps /= connectedAgents.length;

@@ -1,3 +1,10 @@
+## SpaceViewer 2.2.26
+
+- **Correção Definitiva de Exceção ao Conectar no Transmissor (`Cannot read properties of undefined (reading 'latency')`)**:
+  - Inicialização segura de métricas de desempenho (`metrics`: latency, fps, bandwidth, packetsLost, jitter) em todos os agentes no momento da conexão pelo servidor de sinalização e no armazenamento central (`masterStore`).
+  - Blindagem completa com encadeamento opcional (`agent.metrics?.latency`) e fallback para 0 no painel de monitoramento de rede (`NetworkMonitor.tsx`), no dashboard de agentes (`Dashboard.tsx`) e na listagem detalhada (`AgentsList.tsx`).
+  - Proteção em `AgentView.tsx` e `MasterApp.tsx` para garantir estabilidade contínua durante o streaming WebRTC.
+
 ## SpaceViewer 2.2.25
 
 - **Prevenção Definitiva da Tela Branca (React ErrorBoundary & Safe Renderer)**:

@@ -187,7 +187,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               </button>
                             )}
                             <span className="font-mono text-[10px] text-neutral-800 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded">
-                              {agent.metrics.latency.toFixed(0)} ms
+                              {(agent.metrics?.latency ?? 0).toFixed(0)} ms
                             </span>
                             <span className={`h-1.5 w-1.5 rounded-full ${agent.status === 'streaming' ? 'bg-emerald-600' : 'bg-neutral-400'}`} />
                           </>

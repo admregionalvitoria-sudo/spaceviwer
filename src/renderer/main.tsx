@@ -1,4 +1,4 @@
-// SpaceViewer v2.2.25
+// SpaceViewer v2.2.26
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';

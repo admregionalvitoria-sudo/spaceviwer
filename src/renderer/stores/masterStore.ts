@@ -93,14 +93,28 @@ export const useMasterStore = create<MasterState>((set, get) => ({
 
   addAgent: (agent) =>
     set((state) => {
+      const defaultMetrics = {
+        latency: 0,
+        fps: 0,
+        bandwidth: 0,
+        packetsLost: 0,
+        jitter: 0,
+        decodingTime: 0,
+      };
+      const safeAgent = {
+        ...agent,
+        metrics: agent.metrics || defaultMetrics,
+      };
       // Avoid duplicate agents
       const exists = state.connectedAgents.some((a) => a.id === agent.id);
       if (exists) {
         return {
-          connectedAgents: state.connectedAgents.map((a) => (a.id === agent.id ? { ...a, ...agent } : a)),
+          connectedAgents: state.connectedAgents.map((a) =>
+            a.id === agent.id ? { ...a, ...safeAgent, metrics: safeAgent.metrics || a.metrics || defaultMetrics } : a
+          ),
         };
       }
-      return { connectedAgents: [...state.connectedAgents, agent] };
+      return { connectedAgents: [...state.connectedAgents, safeAgent as any] };
     }),
 
   removeAgent: (id) =>
@@ -117,7 +131,15 @@ export const useMasterStore = create<MasterState>((set, get) => ({
 
   updateAgent: (id, updates) =>
     set((state) => ({
-      connectedAgents: state.connectedAgents.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+      connectedAgents: state.connectedAgents.map((a) =>
+        a.id === id
+          ? {
+              ...a,
+              ...updates,
+              metrics: updates.metrics ? { ...a.metrics, ...updates.metrics } : a.metrics,
+            }
+          : a
+      ),
     })),
 
   selectScreen: (selectedScreen) => set({ selectedScreen }),

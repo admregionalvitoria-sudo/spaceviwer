@@ -142,6 +142,14 @@ export class SignalingServer extends EventEmitter {
       name: `Agent-${id.slice(0, 6)}`,
       status: 'pending',
       authenticated: false,
+      metrics: {
+        latency: 0,
+        fps: 0,
+        bandwidth: 0,
+        packetsLost: 0,
+        jitter: 0,
+        decodingTime: 0,
+      },
     });
   }
 
