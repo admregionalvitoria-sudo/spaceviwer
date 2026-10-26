@@ -1,12 +1,21 @@
-# VB-CABLE is downloaded from its publisher; it is not redistributed in SpaceViewer.
-# Donationware and professional-use licensing: https://vb-audio.com/Services/licensing.htm
+param([switch]$Bundled)
+# VB-CABLE is the vendor's donationware. Bundled packages are fetched from the
+# official source during the SpaceViewer build and verified before installation.
+# Licensing and origin: https://vb-audio.com/Services/licensing.htm
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 $driver = Join-Path $env:ProgramData 'SpaceViewer\VB-CABLE-45'
 New-Item -ItemType Directory -Path $driver -Force | Out-Null
 $archive = Join-Path $driver 'VBCABLE_Driver_Pack45.zip'
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$client = New-Object Net.WebClient
-try { $client.DownloadFile('https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip', $archive) } finally { $client.Dispose() }
+$bundledArchive = Join-Path $PSScriptRoot 'driver\audio\VBCABLE_Driver_Pack45.zip'
+if ($Bundled -and !(Test-Path -LiteralPath $bundledArchive)) { throw 'O pacote VB-CABLE nao foi incluido neste instalador.' }
+if (Test-Path -LiteralPath $bundledArchive) {
+    Copy-Item -LiteralPath $bundledArchive -Destination $archive -Force
+} else {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $client = New-Object Net.WebClient
+    try { $client.DownloadFile('https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip', $archive) } finally { $client.Dispose() }
+}
 $stream = [IO.File]::OpenRead($archive)
 $hasher = [Security.Cryptography.SHA256]::Create()
 try { $hash = [BitConverter]::ToString($hasher.ComputeHash($stream)).Replace('-', '') } finally { $stream.Dispose(); $hasher.Dispose() }

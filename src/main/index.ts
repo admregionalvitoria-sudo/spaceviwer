@@ -4,6 +4,29 @@ import { setProjectedApplicationAudio, setNativeSessionAudio, getNativeAudioStat
 // ScreenFlow — Main Electron Entry Point
 // ============================================================
 
+// Catch non-fatal network interface / mDNS / SSDP multicast exceptions (e.g. EADDRNOTAVAIL 224.0.0.251:5353)
+process.on('uncaughtException', (err: any) => {
+  const msg = err?.message || String(err);
+  if (
+    msg.includes('EADDRNOTAVAIL') ||
+    msg.includes('ENETUNREACH') ||
+    msg.includes('EHOSTUNREACH') ||
+    msg.includes('EADDRINUSE') ||
+    msg.includes('224.0.0.251') ||
+    msg.includes('5353') ||
+    msg.includes('1900') ||
+    msg.includes('239.255.255.250')
+  ) {
+    console.warn('[SpaceViewer] Handled non-fatal network socket exception:', msg);
+    return;
+  }
+  console.error('[SpaceViewer] Uncaught Exception in main process:', err);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  console.warn('[SpaceViewer] Unhandled Promise Rejection in main process:', reason);
+});
+
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 
 // Disable WebRTC mDNS local IP hiding to ensure devices on local network can resolve raw IPs

@@ -1,3 +1,11 @@
+## SpaceViewer 2.2.24
+
+- **Correção de Exceção de Rede mDNS / Bonjour (EADDRNOTAVAIL 224.0.0.251:5353)**:
+  - Proteção completa do socket UDP de autodescoberta com supressão de erros assíncronos e callbacks seguros em `patchBonjourService` e `createSafeBonjour`.
+  - Configuração de `reuseAddr: true` sem amarras a IPs voláteis, prevenindo erros ao alternar conexões Wi-Fi ou interfaces de rede.
+  - Callbacks seguros no envio de mensagens de descoberta SSDP em `TVDiscovery` e no reanúncio mDNS.
+  - Escudo global no processo principal do Electron (`uncaughtException` e `unhandledRejection`) para isolar falhas transitórias de sockets UDP de rede.
+
 ## SpaceViewer 2.2.23
 
 - **Otimização de Desempenho e Reutilização de Buffer NV12**:
@@ -5,6 +13,10 @@
 - **Estabilidade de Transmissão em Redes Wi-Fi**:
   - Ajuste do bitrate padrão de transmissão para 20 Mbps (otimizado para streaming 1080p a 60 FPS em Wi-Fi), reduzindo o congestionamento e instabilidade da rede sem fio.
   - Novas orientações no painel do Moonlight recomendando redes de 5 GHz / 6 GHz e redução preventiva para 15 Mbps caso a TV apresente engasgos.
+- **Instalação Integrada do VB-CABLE**:
+  - O pacote oficial, fixado por SHA-256 durante o build, é incluído no instalador Windows e pode ser instalado durante o setup, sem download no computador do usuário.
+  - O driver permanece opcional; a tela de instalação informa a origem VB-Audio, o modelo donationware e o link de licenciamento.
+  - O botão de instalação manual reutiliza o pacote integrado e evita exibir saída CLIXML do PowerShell como erro.
 
 ## SpaceViewer 2.2.22
 

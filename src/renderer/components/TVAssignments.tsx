@@ -9,6 +9,7 @@ export function TVAssignments() {
   const [audioStatus, setAudioStatus] = useState<NativeAudioStatus>({
     installed: false,
     redirected: false,
+    error: '',
   });
   const [hostSettings, setHostSettingsState] = useState<HostSettings>({
     display: 0,
@@ -212,7 +213,7 @@ export function TVAssignments() {
         </div>
 
         <p className="text-[11px] text-neutral-500">
-          O padrão de 40 Mbps em 1080p 60 FPS elimina artefatos de compressão borrados na TV, mantendo a transmissão em tempo real.
+          Em Wi-Fi, comece com 20 Mbps em 1080p; aumente gradualmente se a imagem precisar de mais nitidez e a conexão continuar estável.
         </p>
       </div>
 
@@ -228,7 +229,8 @@ export function TVAssignments() {
             </div>
             <p className="text-xs text-amber-800">
               Para sair o áudio sincronizado com a imagem na TV pelo Moonlight, instale o driver de áudio virtual (VB-CABLE).
-              Você também pode executar o arquivo <span className="font-mono font-bold">INSTALAR_DRIVER_AUDIO.bat</span> como Administrador.
+              O VB-CABLE é um software da VB-Audio distribuído como donationware; contribuições são bem-vindas e o uso profissional requer licença.{' '}
+              <a className="font-semibold underline" href="https://vb-audio.com/Services/licensing.htm" target="_blank" rel="noreferrer">Licença e origem oficial</a>.
             </p>
           </div>
           <button
@@ -311,7 +313,7 @@ export function TVAssignments() {
 
           <div className="flex items-center justify-between text-xs text-neutral-600">
             <span>Áudio do Windows unificado e sincronizado em tempo real para esta TV.</span>
-            {session.audioPackets > 0 && (
+            {(session.audioPackets ?? 0) > 0 && (
               <span className="font-mono text-[10px] text-neutral-500">
                 {session.audioPackets} pacotes Opus
               </span>

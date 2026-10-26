@@ -1,5 +1,17 @@
 # Third-party notices
 
+## VB-CABLE
+
+The Windows installer may include the official VB-CABLE package from VB-Audio
+(https://www.vb-cable.com/). VB-CABLE is donationware; contributions are
+welcome, and professional use requires a license. The setup page identifies
+the vendor and links to its licensing and donation information:
+https://vb-audio.com/Services/licensing.htm . The package is downloaded from
+the vendor during the Windows build, pinned to SHA-256
+`B950E39F01AF1D04EA623C8F6D8EB9B6EA5C477C637295FABF20631C85116BFB`, and its
+driver catalog signature is checked again before installation. The user can
+opt out in setup.
+
 ## Virtual Display Driver
 
 SenaiStream Setup 0.4.0 includes the signed x64 Virtual Display Driver package from VirtualDrivers/Virtual-Display-Driver release 25.7.23. The driver is distributed under the MIT License; its complete license is installed beside the driver package. The upstream release archive SHA-256 is `e24210692b442b39af763536330ce78b423f19342b7a7792c26de3944e418b3a`.

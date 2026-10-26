@@ -237,6 +237,12 @@ Para assegurar o nível de excelência visual, consistência tipográfica e acab
 
 ## Histórico de Atualizações (Changelog)
 
+### [v2.2.24] — Correção de Exceção de Rede mDNS / Bonjour (EADDRNOTAVAIL)
+- Resolução da falha assíncrona `send EADDRNOTAVAIL 224.0.0.251:5353` do Node.js com fábrica segura e supressão de exceções em `createSafeBonjour` e `patchBonjourService`.
+- Sockets UDP de autodescoberta com `reuseAddr: true` e sem fixação rígida em interfaces voláteis.
+- Adicionados callbacks defensivos nas chamadas de envio SSDP e reanúncio mDNS.
+- Manipuladores globais `uncaughtException` e `unhandledRejection` no processo principal para blindar o Electron contra quedas transitórias de rede.
+
 ### [v2.2.23] — Aprimoramentos de Estabilidade de Transmissão (Wi-Fi e Buffer NV12)
 - Reutilização do buffer NV12 no caminho de vídeo ao vivo para evitar uma nova alocação de imagem a cada quadro.
 - Alinhamento do bitrate padrão com 20 Mbps para streaming 1080p em Wi-Fi, reduzindo a pressão sustentada sobre a rede sem fio.
@@ -383,6 +389,6 @@ Na aba **Telas** ou **Moonlight**, cada TV mantém sua própria tela virtual. O 
 
 O som de todos os aplicativos que usam a saída padrão é compartilhado. Aplicativos fixados manualmente em uma saída física devem ser alterados para a saída padrão do Windows. Imagens continuam independentes. A seleção opcional de aplicativo mantém a captura por processo (Windows build 20348+); abas do mesmo processo não são separáveis. Projetar uma janela não substitui o modo compartilhado escolhido.
 
-VB-CABLE é donationware da VB-Audio; uso profissional requer licença: https://vb-audio.com/Services/licensing.htm . O botão instala o pacote original diretamente do fornecedor, sem compra automática. O instalador do SpaceViewer não inclui o driver.
+VB-CABLE é donationware da VB-Audio; uso profissional requer licença. A origem, licença e opções de contribuição são apresentadas durante a instalação e no painel do SpaceViewer. O build do instalador inclui o pacote oficial, verificado por SHA-256 e assinatura do driver; assim a instalação não precisa baixar o pacote no computador do usuário. O driver continua opcional no setup.
 
 Validação: áudio real da saída virtual recebido simultaneamente por dois clientes UDP, descriptografado e decodificado com energia de sinal não nula; seleção/mute independente, vídeo em duas telas e restauração da saída local. Reprodução nas TVs físicas depende de confirmação do usuário.

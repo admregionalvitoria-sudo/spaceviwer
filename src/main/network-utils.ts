@@ -7,7 +7,7 @@
 
 import * as os from 'os';
 import { exec } from 'child_process';
-import { Service } from 'bonjour-service';
+import { Bonjour, Service } from 'bonjour-service';
 
 /**
  * Returns a list of all active, physical LAN/Wi-Fi IPv4 addresses.
@@ -124,6 +124,69 @@ export function patchBonjourService(): void {
   } catch (err) {
     console.warn('[SpaceViewer] Failed to patch Bonjour service records:', err);
   }
+
+  // Also patch underlying mdns-server Server to prevent unhandled EADDRNOTAVAIL exceptions
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mdnsServerMod = require('bonjour-service/dist/lib/mdns-server');
+    const Server = mdnsServerMod.Server || mdnsServerMod.default;
+    if (Server && Server.prototype) {
+      const origRespondToQuery = Server.prototype.respondToQuery;
+      Server.prototype.respondToQuery = function (query: any) {
+        if (!this.errorCallback || this.errorCallback.toString().includes('throw err')) {
+          this.errorCallback = (err: any) => {
+            console.warn('[SpaceViewer] Suppressed mDNS query response error:', err?.message || err);
+          };
+        }
+        if (this.mdns && typeof this.mdns.on === 'function' && !this._hasMdnsErrorListeners) {
+          this._hasMdnsErrorListeners = true;
+          this.mdns.on('error', (err: any) => {
+            console.warn('[SpaceViewer] Suppressed mDNS error event:', err?.message || err);
+          });
+          this.mdns.on('warning', (err: any) => {
+            console.warn('[SpaceViewer] Suppressed mDNS warning event:', err?.message || err);
+          });
+        }
+        return origRespondToQuery.call(this, query);
+      };
+    }
+  } catch (serverPatchErr) {
+    console.warn('[SpaceViewer] Failed to patch mdns-server Server:', serverPatchErr);
+  }
+}
+
+/**
+ * Safely creates a Bonjour instance configured with reuseAddr and safe error handlers
+ * to prevent uncaught exceptions (e.g. EADDRNOTAVAIL 224.0.0.251:5353) on Windows.
+ */
+export function createSafeBonjour(
+  opts: any = {},
+  errorCallback?: (err: any) => void
+): Bonjour {
+  patchBonjourService();
+
+  const safeErrCb =
+    errorCallback ||
+    ((err: any) => {
+      console.warn('[SpaceViewer] mDNS safe handler suppressed error:', err?.message || err);
+    });
+
+  const finalOpts = {
+    reuseAddr: true,
+    ...(opts || {}),
+  };
+
+  const instance = new Bonjour(finalOpts, safeErrCb);
+
+  try {
+    const mdns = (instance as any)?.server?.mdns;
+    if (mdns && typeof mdns.on === 'function') {
+      mdns.on('error', safeErrCb);
+      mdns.on('warning', safeErrCb);
+    }
+  } catch {}
+
+  return instance;
 }
 
 /**

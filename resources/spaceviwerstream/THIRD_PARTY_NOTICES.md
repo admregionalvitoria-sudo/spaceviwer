@@ -9,6 +9,6 @@ Only SpaceviwerStream.exe and SpaceviwerStreamDisplayCtl.exe are packaged. The s
 
 ## Optional VB-CABLE output
 
-VB-CABLE by VB-Audio (https://vb-audio.com/Cable/) is donationware. Contributions are welcome; professional use requires the publisher's license. It is downloaded directly from its publisher when the user chooses to install audio support, and is not bundled with SpaceViewer. Licensing: https://vb-audio.com/Services/licensing.htm . The downloaded package and its license remain in ProgramData/SpaceViewer/VB-CABLE-45.
+VB-CABLE by VB-Audio (https://www.vb-cable.com/) is donationware. Contributions are welcome; professional use requires the publisher's license. The official package is downloaded and SHA-256 verified during the Windows build, included in the SpaceViewer installer, and installed only when selected in setup. Its driver catalog signature is checked before installation. Licensing: https://vb-audio.com/Services/licensing.htm . The package and its license remain in ProgramData/SpaceViewer/VB-CABLE-45.
 
 Process audio capture uses the Windows Application Loopback API, documented at https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/applicationloopbackaudio-sample/ . Playback policy ABI reference: https://github.com/File-New-Project/EarTrumpet/blob/master/EarTrumpet/Interop/MMDeviceAPI/IPolicyConfig.cs .

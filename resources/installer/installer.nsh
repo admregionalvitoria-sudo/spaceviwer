@@ -13,9 +13,12 @@
   Var RadioAgent
   Var RadioBoth
   Var SelectedMode
+  Var InstallAudio
+  Var InstallAudioSelected
 !endif
 
 !macro customInit
+  StrCpy $InstallAudioSelected "1"
   UserInfo::GetAccountType
   Pop $0
   ${If} $0 != "admin"
@@ -71,10 +74,20 @@ Function showInstallModePage
   ${NSD_CreateRadioButton} 10u 70u 80% 15u "Instalar apenas o Agente (Dispositivo que servira como tela secundaria)"
   Pop $RadioAgent
 
+  ${NSD_CreateCheckBox} 10u 94u 90% 34u "Instalar VB-CABLE da VB-Audio (donationware) agora. Origem: vb-cable.com. Doacoes sao bem-vindas; uso profissional exige licenca: vb-audio.com/Services/licensing.htm."
+  Pop $InstallAudio
+  ${NSD_Check} $InstallAudio
+
   nsDialogs::Show
 FunctionEnd
 
 Function leaveInstallModePage
+  ${NSD_GetState} $InstallAudio $0
+  ${If} $0 == ${BST_CHECKED}
+    StrCpy $InstallAudioSelected "1"
+  ${Else}
+    StrCpy $InstallAudioSelected "0"
+  ${EndIf}
   ${NSD_GetState} $RadioMaster $0
   ${If} $0 == ${BST_CHECKED}
     StrCpy $SelectedMode "master"
@@ -104,6 +117,17 @@ FunctionEnd
   !endif
   
   FileClose $0
+
+  ${If} $InstallAudioSelected == "1"
+    ${If} $SelectedMode != "agent"
+      DetailPrint "Instalando o VB-CABLE oficial da VB-Audio..."
+      nsExec::ExecToLog 'powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\resources\spaceviwerstream\install-audio.ps1" -Bundled'
+      Pop $1
+      ${If} $1 != 0
+        DetailPrint "O SpaceViewer foi instalado, mas o VB-CABLE nao pode ser ativado. Tente novamente pelo painel de audio."
+      ${EndIf}
+    ${EndIf}
+  ${EndIf}
 
   # Monitor creation is controlled by the interface and preserves the user's count.
   # Stop the superseded standalone host so the integrated server can bind its ports.

@@ -10,6 +10,7 @@ import type { MasterInfo } from '../shared/types';
 import { MDNS_SERVICE_TYPE, MDNS_AGENT_TYPE, APP_VERSION } from '../shared/constants';
 import {
   patchBonjourService,
+  createSafeBonjour,
   getCleanMdnsHostname,
   getLocalIPv4Addresses,
   getPrimaryLANIPv4,
@@ -35,11 +36,12 @@ export class NetworkDiscovery extends EventEmitter {
     const primaryIp = getPrimaryLANIPv4();
 
     try {
-      this.bonjour = new Bonjour({ interface: primaryIp, reuseAddr: true } as any);
-      console.log(`[SpaceViewer] mDNS: Initialized Bonjour on physical LAN interface: ${primaryIp}`);
+      this.bonjour = createSafeBonjour({ reuseAddr: true }, (err) => {
+        console.warn(`[SpaceViewer] mDNS (discovery) suppressed error:`, err?.message || err);
+      });
+      console.log(`[SpaceViewer] mDNS: Initialized Bonjour (reuseAddr=true, primary LAN=${primaryIp})`);
     } catch (err) {
-      console.warn(`[SpaceViewer] Failed to bind Bonjour to interface ${primaryIp}, falling back to default:`, err);
-      this.bonjour = new Bonjour({ reuseAddr: true } as any);
+      console.warn(`[SpaceViewer] Failed to initialize Bonjour:`, err);
     }
   }
 
@@ -139,7 +141,11 @@ export class NetworkDiscovery extends EventEmitter {
           if (mdnsServer && typeof mdnsServer.respond === 'function') {
             for (const s of this.publishedServices) {
               if (s && typeof (s as any).records === 'function') {
-                mdnsServer.respond((s as any).records());
+                mdnsServer.respond((s as any).records(), undefined, (err: any) => {
+                  if (err) {
+                    console.warn('[SpaceViewer] mDNS reannounce warning:', err?.message || err);
+                  }
+                });
               }
             }
           }

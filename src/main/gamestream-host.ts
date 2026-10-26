@@ -305,7 +305,13 @@ export async function installNativeAudio() {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     return { success: false, error: 'O driver foi instalado, mas o host ainda não encontrou a saída virtual. Reinicie o host.' };
-  } catch (error) { return { success: false, error: (error as Error).message }; }
+  } catch (error) {
+    const message = (error as Error).message;
+    const cleanMessage = message.includes('#< CLIXML')
+      ? 'A instalação do VB-CABLE falhou. Feche e reabra o SpaceViewer como Administrador e tente novamente.'
+      : message;
+    return { success: false, error: cleanMessage };
+  }
 }
 
 /** Associates a projected window with the TV using that exact monitor. */

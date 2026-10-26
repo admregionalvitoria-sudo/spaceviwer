@@ -13,6 +13,7 @@ import type { SmartTVDevice, MoonlightClient } from '../shared/types';
 import { getMoonlightClients, getStreamStats } from './gamestream-host';
 import {
   patchBonjourService,
+  createSafeBonjour,
   getLocalIPv4Addresses,
   ensurePrivateNetworkProfile,
 } from './network-utils';
@@ -89,7 +90,9 @@ export class TVDiscovery extends EventEmitter {
   // ------------------------------------------------------------
   private initBonjour() {
     try {
-      this.bonjour = new Bonjour();
+      this.bonjour = createSafeBonjour({ reuseAddr: true }, (err) => {
+        console.warn('[TVDiscovery] mDNS error (suppressed):', err?.message || err);
+      });
 
       const serviceTypes = [
         '_googlecast._tcp',
@@ -225,10 +228,14 @@ export class TVDiscovery extends EventEmitter {
       for (const ip of lanIps) {
         try {
           this.udpSocket?.setMulticastInterface(ip);
-          this.udpSocket?.send(message, 0, message.length, SSDP_PORT, SSDP_ADDRESS);
+          this.udpSocket?.send(message, 0, message.length, SSDP_PORT, SSDP_ADDRESS, (err) => {
+            if (err) console.warn(`[TVDiscovery] SSDP send error on ${ip}:`, err.message);
+          });
         } catch {
           try {
-            this.udpSocket?.send(message, 0, message.length, SSDP_PORT, SSDP_ADDRESS);
+            this.udpSocket?.send(message, 0, message.length, SSDP_PORT, SSDP_ADDRESS, (err) => {
+              if (err) console.warn('[TVDiscovery] SSDP fallback send error:', err.message);
+            });
           } catch {}
         }
       }

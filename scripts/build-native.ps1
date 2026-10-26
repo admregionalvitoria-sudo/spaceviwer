@@ -8,6 +8,7 @@ function Get-Sha256([string]$FilePath) {
 }
 Push-Location $root
 try {
+    & (Join-Path $PSScriptRoot 'fetch-audio-driver.ps1')
     $msysShell = 'C:\msys64\msys2_shell.cmd'
     $destination = Join-Path $root 'resources\spaceviwerstream'
     $streamExe = Join-Path $destination 'SpaceviwerStream.exe'
@@ -25,7 +26,8 @@ try {
                 }
                 $sources = Get-ChildItem -LiteralPath (Join-Path $root 'native\spaceviwerstream\src'), (Join-Path $root 'native\spaceviwerstream\include') -File -Recurse |
                     Sort-Object FullName | ForEach-Object { @{ path = $_.FullName.Substring($root.Length + 1); sha256 = (Get-Sha256 $_.FullName) } }
-                @{ version = '2.2.22'; builtAt = (Get-Date).ToUniversalTime().ToString('o'); sources = @($sources); binaries = @(
+                $appVersion = (Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
+                @{ version = $appVersion; builtAt = (Get-Date).ToUniversalTime().ToString('o'); sources = @($sources); binaries = @(
                     Get-ChildItem -LiteralPath $destination -Filter '*.exe' | ForEach-Object { @{ name = $_.Name; sha256 = (Get-Sha256 $_.FullName) } }
                 ) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $destination 'build-manifest.json') -Encoding UTF8
                 $recompiled = $true
