@@ -7,8 +7,10 @@ import { desktopCapturer, screen } from 'electron';
 import { exec } from 'child_process';
 import type { AppWindowSource, DetailedScreenInfo, ScreenSource } from '../shared/types';
 import { getActiveProjectors } from './projector';
-import { getHostDisplays, getHostSettings } from './gamestream-host';
 import { getWindowsDisplayInventory, matchWindowsDisplay } from './windows-displays';
+import { optionalWithin } from '../shared/async';
+
+let detailedPending: Promise<DetailedScreenInfo[]> | null = null;
 
 /**
  * Lists all available screens and windows for capture.
@@ -32,36 +34,31 @@ export async function getAvailableScreens(): Promise<ScreenSource[]> {
  * Gets rich detailed information for all connected screens with high-definition live previews.
  */
 export async function getScreensDetailed(): Promise<DetailedScreenInfo[]> {
+  if (!detailedPending) detailedPending = loadDetailedScreens().finally(() => { detailedPending = null; });
+  return detailedPending;
+}
+
+async function loadDetailedScreens(): Promise<DetailedScreenInfo[]> {
   try {
     const displays = screen.getAllDisplays();
     const primaryDisplay = screen.getPrimaryDisplay();
-    const sources = await desktopCapturer.getSources({
+    const sourceWork = desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: { width: 960, height: 540 },
     });
 
     const activeProjectors = getActiveProjectors();
-    const [inventory, hostDisplays, settings] = await Promise.all([getWindowsDisplayInventory(), getHostDisplays(), getHostSettings()]);
+    const [sources, inventory] = await Promise.all([
+      optionalWithin(sourceWork, []),
+      optionalWithin(getWindowsDisplayInventory(), { installed: false, enabled: false, active: false, count: 0, configuredCount: 0, outputs: 0, displays: [], virtualOutputs: [] }),
+    ]);
 
-    let seenVirtual = false;
-    const filteredDisplays = displays.filter((disp) => {
-      const isPrimary = disp.id === primaryDisplay.id;
-      if (isPrimary) return true;
-      const native = matchWindowsDisplay(disp, inventory.displays);
-      if (native?.isVirtual) {
-        if (seenVirtual) return false;
-        seenVirtual = true;
-      }
-      return true;
-    });
-
-    return filteredDisplays.map((disp, idx) => {
+    return displays.map((disp, idx) => {
       const isPrimary = disp.id === primaryDisplay.id;
       const matchedSource = sources.find((s) => s.display_id === String(disp.id));
       const sourceId = matchedSource?.id || '';
       const native = matchWindowsDisplay(disp, inventory.displays);
       const isVirtual = native?.isVirtual ?? false;
-      const isMoonlightTarget = Boolean(native && hostDisplays.some((d) => d.index === settings.display && d.deviceName.toLowerCase() === native.deviceName.toLowerCase()));
 
       const projected = activeProjectors[disp.id.toString()] || null;
 
@@ -72,7 +69,7 @@ export async function getScreensDetailed(): Promise<DetailedScreenInfo[]> {
       const name = isPrimary
         ? `Tela 1 — Monitor Principal (${resW}×${resH})`
         : isVirtual
-        ? `Tela 2 — Monitor Virtual Moonlight (${resW}×${resH})`
+        ? `Tela ${idx + 1} — Monitor Virtual (${resW}×${resH})`
         : `Tela ${idx + 1} — Monitor Físico (${resW}×${resH})`;
 
       return {
@@ -84,7 +81,6 @@ export async function getScreensDetailed(): Promise<DetailedScreenInfo[]> {
         scaleFactor: scale,
         isPrimary,
         isVirtual,
-        isMoonlightTarget,
         thumbnail: matchedSource ? matchedSource.thumbnail.toDataURL() : '',
         projectedApp: projected ? { sourceId: projected.sourceId, appName: projected.appName } : null,
       };

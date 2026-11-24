@@ -71,7 +71,7 @@ export function getPrimaryLANIPv4(): string {
 }
 
 /**
- * Clean hostname for RFC 6763 / GameStream mDNS compliance (letters, digits, dashes, max 63 chars)
+ * Clean hostname for RFC 6763 mDNS compliance (letters, digits, dashes, max 63 chars)
  */
 export function getCleanMdnsHostname(): string {
   const raw = os.hostname();
@@ -83,7 +83,7 @@ let bonjourPatched = false;
 
 /**
  * Patches bonjour-service Service.prototype.records to only publish
- * physical LAN IPv4 addresses, avoiding advertising VirtualBox or VPN IPs to Moonlight.
+ * physical LAN IPv4 addresses, avoiding advertising VirtualBox or VPN IPs.
  */
 export function patchBonjourService(): void {
   if (bonjourPatched) return;
@@ -207,20 +207,19 @@ export function ensurePrivateNetworkProfile(): void {
     }
   );
 
-  ensureGameStreamFirewallRules();
+  ensureSpaceViewerFirewallRules();
 }
 
 /**
- * Ensures Windows Firewall allows inbound traffic for Moonlight GameStream (UDP 47999 / 47998-48010),
+ * Ensures Windows Firewall allows inbound traffic for receiver discovery (UDP 47810/47812),
  * mDNS discovery (UDP 5353) and WebRTC without executable path restrictions.
  */
-export function ensureGameStreamFirewallRules(): void {
+export function ensureSpaceViewerFirewallRules(): void {
   if (process.platform !== 'win32') return;
 
   const script = `
     $rules = @(
-      @{ Name = "SpaceViewer GameStream Ports UDP"; Protocol = "UDP"; Port = "47984-48010" },
-      @{ Name = "SpaceViewer GameStream Ports TCP"; Protocol = "TCP"; Port = "47984-48010" },
+      @{ Name = "SpaceViewer Display Discovery UDP"; Protocol = "UDP"; Port = "47810,47812" },
       @{ Name = "SpaceViewer Discovery UDP"; Protocol = "UDP"; Port = "5353,1900" },
       @{ Name = "SpaceViewer WebRTC TCP"; Protocol = "TCP"; Port = "7523,7524" }
     )
@@ -234,7 +233,7 @@ export function ensureGameStreamFirewallRules(): void {
   const b64 = Buffer.from(script, 'utf16le').toString('base64');
   exec(`powershell -NoProfile -NonInteractive -EncodedCommand ${b64}`, (err) => {
     if (!err) {
-      console.log('[SpaceViewer] GameStream and Moonlight firewall rules (including UDP 47999) verified.');
+      console.log('[SpaceViewer] Firewall rules for discovery and streaming verified.');
     }
   });
 }

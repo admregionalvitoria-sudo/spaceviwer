@@ -2,10 +2,9 @@
 import React from 'react';
 import clsx from 'clsx';
 import logoUrl from '../../assets/logo.png';
-import type { SidebarTab } from './Sidebar';
 import { APP_VERSION } from '../../../shared/constants';
 
-export { SidebarTab };
+export type SidebarTab = 'screens' | 'dashboard' | 'settings';
 
 interface BottomNavProps {
   activeTab: SidebarTab;
@@ -13,7 +12,6 @@ interface BottomNavProps {
   serverStatus: 'running' | 'stopped';
   streamStatus?: 'idle' | 'starting' | 'streaming' | 'paused' | 'error';
   activeAgentsCount: number;
-  moonlightClientsCount?: number;
   screensCount?: number;
   onStopStream?: () => void;
   onStartStream?: () => void;
@@ -27,7 +25,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   serverStatus,
   streamStatus = 'idle',
   activeAgentsCount,
-  moonlightClientsCount = 0,
   screensCount,
   onStopStream,
   onResetMode,
@@ -52,6 +49,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     {
       id: 'dashboard',
       label: 'Painel',
+      badge: activeAgentsCount,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -64,52 +62,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       ),
     },
     {
-      id: 'agents',
-      label: 'Agentes',
-      badge: activeAgentsCount,
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-        </svg>
-      ),
-    },
-    {
-      id: 'moonlight',
-      label: 'Moonlight',
-      badge: moonlightClientsCount,
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-          />
-        </svg>
-      ),
-    },
-    {
-      id: 'network',
-      label: 'Rede',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-          />
-        </svg>
-      ),
-    },
-    {
       id: 'settings',
-      label: 'Ajustes',
+      label: 'Opções',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -133,7 +87,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
   return (
     <div className="w-full px-4 pb-3 pt-1 pointer-events-none select-none z-50">
-      <div className="max-w-5xl mx-auto pointer-events-auto bg-white/95 backdrop-blur-xl border border-neutral-300/80 shadow-xl rounded-2xl px-4 py-2 flex items-center justify-between gap-2">
+      <div className="max-w-4xl mx-auto pointer-events-auto bg-white/95 backdrop-blur-xl border border-neutral-300/80 shadow-sm rounded-2xl px-4 py-2 flex items-center justify-between gap-2">
         {/* Left Section: Branding & Server Status */}
         <div className="flex items-center space-x-3 min-w-[170px]">
           <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain drop-shadow-sm select-none" />
@@ -170,12 +124,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             return (
               <button
                 key={item.id}
+                type="button"
+                aria-current={isActive ? 'page' : undefined}
                 onClick={() => onChangeTab(item.id)}
                 className={clsx(
                   'flex flex-col items-center justify-center min-w-[62px] sm:min-w-[76px] py-1 px-2.5 rounded-xl transition-all duration-200 cursor-pointer group relative',
                   isActive
-                    ? 'bg-neutral-900 text-white shadow-md scale-[1.03]'
-                    : 'text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/90 hover:scale-[1.02]'
+                    ? 'bg-neutral-900 text-white shadow-sm'
+                    : 'text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/90'
                 )}
               >
                 <div className="relative flex items-center justify-center">

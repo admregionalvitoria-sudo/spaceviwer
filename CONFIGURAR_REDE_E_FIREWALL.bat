@@ -1,7 +1,7 @@
-:: SpaceViewer v2.2.9
+:: SpaceViewer v3.0.0
 @echo off
 cd /d "%~dp0"
-title SpaceViewer - Configurador de Rede, Firewall e Moonlight
+title SpaceViewer - Configurador de Rede e Firewall
 color 0b
 
 :: 1. Solicitar privilegios de Administrador
@@ -16,10 +16,11 @@ echo ====================================================================
 echo      SPACEVIEWER - CONFIGURACAO DE REDE LOCAL E FIREWALL
 echo ====================================================================
 echo.
-echo Este utilitario resolve problemas de descoberta no Moonlight e Smart TVs:
+echo Este utilitario resolve problemas para encontrar tablets e celulares
+echo com o app SpaceViewer Display:
 echo 1. Ajusta o perfil da rede Wi-Fi para Particular (Privada)
-echo 2. Habilita as portas de descoberta mDNS (5353) e SSDP (1900)
-echo 3. Configura as regras do Firewall do Windows para o SpaceViewer e SpaceviwerStream
+echo 2. Libera a descoberta dos aparelhos (UDP 47810 e 47812) e mDNS (5353)
+echo 3. Libera a conexao de video do SpaceViewer (TCP 7523 e WebRTC)
 echo.
 
 :: 2. Alterar o perfil de rede ativa para Particular (Private)
@@ -40,74 +41,47 @@ sc config upnphost start= demand >nul 2>&1
 net start upnphost >nul 2>&1
 echo       Servicos de descoberta ativos.
 
-:: 4. Adicionar regras completas no Firewall do Windows
+:: 4. Adicionar regras no Firewall do Windows
 echo.
 echo [3/4] Configurando regras do Firewall do Windows...
 
-:: Limpar regras antigas
-netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream TCP" >nul 2>&1
-netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream UDP" >nul 2>&1
-netsh advfirewall firewall delete rule name="SpaceViewer App TCP" >nul 2>&1
-netsh advfirewall firewall delete rule name="SpaceViewer App UDP" >nul 2>&1
-netsh advfirewall firewall delete rule name="SpaceViewer Discovery UDP" >nul 2>&1
-netsh advfirewall firewall delete rule name="SpaceViewer WebRTC TCP" >nul 2>&1
+:: Limpar regras antigas (inclui as do Sunshine / Moonlight de versoes anteriores)
+for %%r in ("SpaceViewer SpaceviwerStream TCP" "SpaceViewer SpaceviwerStream UDP" "SpaceViewer SpaceviwerStream TCP Dev" "SpaceViewer SpaceviwerStream UDP Dev" "SpaceViewer Sunshine TCP" "SpaceViewer Sunshine UDP" "SpaceViewer GameStream Ports TCP" "SpaceViewer GameStream Ports UDP" "SpaceViewer App TCP" "SpaceViewer App UDP" "SpaceViewer Discovery UDP" "SpaceViewer Display Discovery UDP" "SpaceViewer WebRTC TCP") do (
+    netsh advfirewall firewall delete rule name=%%r >nul 2>&1
+)
 
-:: Regras de Descoberta Multicast (mDNS 5353 para Moonlight e SSDP 1900 para Smart TVs)
+:: Descoberta multicast (mDNS 5353, SSDP 1900) e dos aparelhos SpaceViewer Display (47810, 47812)
 netsh advfirewall firewall add rule name="SpaceViewer Discovery UDP" dir=in action=allow profile=any protocol=UDP localport=5353,1900 enable=yes >nul
-echo       - Regra criada: Descoberta Multicast UDP (portas 5353 e 1900)
+netsh advfirewall firewall add rule name="SpaceViewer Display Discovery UDP" dir=in action=allow profile=any protocol=UDP localport=47810,47812 enable=yes >nul
+echo       - Regra criada: Descoberta UDP (5353, 1900, 47810, 47812)
 
-:: Regras GameStream / SpaceviwerStream para Moonlight (TCP 47984, 47989, 48010 e UDP 47998-48010)
-if exist "C:\Program Files\SpaceViewer\resources\spaceviwerstream\SpaceviwerStream.exe" (
-    netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream TCP" dir=in action=allow profile=any protocol=TCP localport=47984,47989,48010 program="C:\Program Files\SpaceViewer\resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes >nul
-    netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream UDP" dir=in action=allow profile=any protocol=UDP localport=47998-48010 program="C:\Program Files\SpaceViewer\resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes >nul
-)
-if exist "%~dp0resources\spaceviwerstream\SpaceviwerStream.exe" (
-    netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream TCP Dev" dir=in action=allow profile=any protocol=TCP localport=47984,47989,48010 program="%~dp0resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes >nul
-    netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream UDP Dev" dir=in action=allow profile=any protocol=UDP localport=47998-48010 program="%~dp0resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes >nul
-)
-:: Regra generica de portas GameStream (para garantir em qualquer pasta)
-netsh advfirewall firewall add rule name="SpaceViewer GameStream Ports TCP" dir=in action=allow profile=any protocol=TCP localport=47984,47989,48010 enable=yes >nul
-netsh advfirewall firewall add rule name="SpaceViewer GameStream Ports UDP" dir=in action=allow profile=any protocol=UDP localport=47998-48010 enable=yes >nul
-echo       - Regra criada: Portas GameStream nativas (TCP 47984, 47989, 48010 e UDP 47998-48010)
-
-:: Regras do Executavel SpaceViewer
+:: Executavel SpaceViewer (WebRTC usa portas UDP dinamicas)
 if exist "C:\Program Files\SpaceViewer\SpaceViewer.exe" (
     netsh advfirewall firewall add rule name="SpaceViewer App TCP" dir=in action=allow profile=any program="C:\Program Files\SpaceViewer\SpaceViewer.exe" enable=yes >nul
     netsh advfirewall firewall add rule name="SpaceViewer App UDP" dir=in action=allow profile=any program="C:\Program Files\SpaceViewer\SpaceViewer.exe" enable=yes >nul
 )
 echo       - Regra criada: Executavel SpaceViewer (TCP e UDP liberados)
 
-:: Regras WebRTC Signaling
+:: Sinalizacao WebRTC e download do APK (7523) e agente PC (7524)
 netsh advfirewall firewall add rule name="SpaceViewer WebRTC TCP" dir=in action=allow profile=any protocol=TCP localport=7523,7524 enable=yes >nul
-echo       - Regra criada: Sinalizacao WebRTC LAN (portas 7523 e 7524)
+echo       - Regra criada: Sinalizacao e download do APK (portas 7523 e 7524)
 
-:: 5. Obter e exibir os enderecos IP locais
+:: 5. Exibir os enderecos IP locais
 echo.
-echo [4/4] Verificando IP local da maquina para conexao no Moonlight...
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
-    set LOCAL_IP=%%a
-    goto :show_ip
-)
+echo [4/4] Enderecos IP deste computador:
+powershell -NoProfile -Command "$ips = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notlike '*Loopback*' -and $_.IPAddress -notlike '169.254*' }).IPAddress; foreach ($ip in $ips) { Write-Host \"      --> IP: $ip   (APK: http://$($ip):7523/apk)\" -ForegroundColor Yellow }"
 
-:show_ip
 color 0a
 echo.
 echo ====================================================================
 echo   CONFIGURACAO CONCLUIDA COM SUCESSO!
 echo.
-echo   Seu computador agora esta visivel na rede local para:
-echo   - Smart TVs (LG WebOS, Samsung Tizen, Android TV, Roku)
-echo   - Clientes Moonlight (Celular, Tablet, TV ou PC)
-echo.
-echo   COMO CONECTAR NO MOONLIGHT AGORA:
-echo   1. Abra o aplicativo Moonlight no seu celular ou TV (na mesma rede Wi-Fi).
-echo   2. Se o SpaceViewer nao aparecer automaticamente na lista:
-echo      Toque no icone de '+' (Adicionar Computador) e digite seu IP:
-echo.
-powershell -NoProfile -Command "$ips = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notlike '*Loopback*' -and $_.IPAddress -notlike '169.254*' }).IPAddress; foreach ($ip in $ips) { Write-Host \"      --> IP: $ip\" -ForegroundColor Yellow }"
-echo.
-echo   3. O Moonlight exibira um PIN de 4 digitos na tela da TV/celular.
-echo   4. No SpaceViewer, va na aba 'Moonlight', digite o PIN e clique em 'Parear PIN'.
+echo   COMO USAR UM TABLET OU CELULAR COMO TELA:
+echo   1. Instale o app SpaceViewer Display (link do APK acima ou QR code
+echo      em SpaceViewer ^> Telas ^> Instalar o app no aparelho).
+echo   2. Abra o app no aparelho, na mesma rede Wi-Fi deste PC.
+echo   3. No SpaceViewer, abra Telas, clique em Buscar e escolha
+echo      Estender ou Duplicar.
 echo ====================================================================
 echo.
 pause

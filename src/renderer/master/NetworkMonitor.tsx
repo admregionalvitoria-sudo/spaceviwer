@@ -11,7 +11,7 @@ interface ChartDataPoint {
   fps: number;
 }
 
-export const NetworkMonitor: React.FC = () => {
+export const NetworkMonitor: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const { connectedAgents, streamStatus, streamStats } = useMasterStore();
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
 
@@ -59,7 +59,7 @@ export const NetworkMonitor: React.FC = () => {
   const currentFps = chartData[chartData.length - 1]?.fps || 0;
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto h-full select-none bg-bg-space text-neutral-900">
+    <div className={embedded ? 'space-y-5 text-neutral-900' : 'flex-1 p-6 space-y-6 overflow-y-auto h-full select-none bg-bg-space text-neutral-900'}>
       {/* Title */}
       <div className="border-b border-neutral-200/60 pb-4">
         <h2 className="font-display font-extrabold text-xl text-neutral-900 tracking-wide uppercase">Monitor de Rede</h2>

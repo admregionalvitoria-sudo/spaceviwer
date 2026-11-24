@@ -46,7 +46,7 @@ export class NetworkDiscovery extends EventEmitter {
   }
 
   /**
-   * Master: Announce this machine as a ScreenFlow master and GameStream (Moonlight) host on the LAN.
+   * Master: Announce this machine as a SpaceViewer master on the LAN.
    */
   publishMaster(name: string, port: number) {
     try {
@@ -56,19 +56,6 @@ export class NetworkDiscovery extends EventEmitter {
       const b = this.bonjour!;
       const cleanHost = getCleanMdnsHostname();
       const hostFqdn = `${cleanHost}.local`;
-
-      // Moonlight target names:
-      // 1. cleanHost: Exact computer hostname for direct host discovery by Moonlight
-      // 2. SpaceViewer - [hostname]
-      // 3. spacedesk - [hostname] (for compatibility)
-      const spaceViewerName = `SpaceViewer - ${cleanHost}`;
-      const primarySpacedeskName = `spacedesk - ${cleanHost}`;
-
-      const nvTxt = {
-        version: '7.1.431.0',
-        appversion: '7.1.431.0',
-        os: process.platform,
-      };
 
       // 1. SpaceViewer Master discovery service (WebRTC / screen mirroring)
       const s1 = b.publish({
@@ -85,53 +72,7 @@ export class NetworkDiscovery extends EventEmitter {
       } as any) as unknown as Service;
       this.publishedServices.push(s1);
 
-      // 2. Moonlight GameStream primary: Computer Hostname directly (_nvstream._tcp on port 47989)
-      const s2 = b.publish({
-        name: cleanHost,
-        type: 'nvstream',
-        port: 47989,
-        host: hostFqdn,
-        probe: false,
-        txt: nvTxt,
-      } as any) as unknown as Service;
-      this.publishedServices.push(s2);
-
-      // 3. Moonlight GameStream branded: SpaceViewer - [hostname]
-      const s3 = b.publish({
-        name: spaceViewerName,
-        type: 'nvstream',
-        port: 47989,
-        host: hostFqdn,
-        probe: false,
-        txt: nvTxt,
-      } as any) as unknown as Service;
-      this.publishedServices.push(s3);
-
-      // 4. Moonlight GameStream compatibility: spacedesk - [hostname]
-      const s4 = b.publish({
-        name: primarySpacedeskName,
-        type: 'nvstream',
-        port: 47989,
-        host: hostFqdn,
-        probe: false,
-        txt: nvTxt,
-      } as any) as unknown as Service;
-      this.publishedServices.push(s4);
-
-      // 5. Moonlight debug channel (_nvstream_dbg._tcp on port 47989)
-      const s5 = b.publish({
-        name: cleanHost,
-        type: 'nvstream_dbg',
-        port: 47989,
-        host: hostFqdn,
-        probe: false,
-        txt: nvTxt,
-      } as any) as unknown as Service;
-      this.publishedServices.push(s5);
-
-      console.log(`[SpaceViewer] mDNS: Published Moonlight host "${cleanHost}", "${spaceViewerName}", "${primarySpacedeskName}" on port 47989`);
-
-      // Periodic re-announcement every 10 seconds so Moonlight on TVs and clients discovers the host promptly
+      // Periodic re-announcement every 10 seconds so agents discover the master promptly
       if (this.reannounceTimer) {
         clearInterval(this.reannounceTimer);
       }

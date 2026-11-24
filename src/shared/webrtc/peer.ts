@@ -16,6 +16,8 @@ export interface PeerOptions {
   onClose?: () => void;
   onError?: (err: Error) => void;
   onData?: (data: Uint8Array) => void;
+  /** Rewrites local SDP (defaults to preferring H.264). */
+  sdpTransform?: (sdp: string) => string;
 }
 
 export interface EncodingParams {
@@ -37,9 +39,7 @@ export class StreamPeer {
       config: {
         iceServers: ICE_SERVERS,
       },
-      sdpTransform: (sdp: string) => {
-        return preferH264(sdp);
-      },
+      sdpTransform: options.sdpTransform ?? ((sdp: string) => preferH264(sdp)),
     });
 
     this.peer.on('signal', (data) => {

@@ -2,10 +2,19 @@ import { create } from 'zustand';
 import type { AppSettings, StreamStatus, Agent, ScreenSource, StreamConfig, StreamStats } from '../../shared/types';
 import { DEFAULT_SETTINGS, DEFAULT_STREAM_CONFIG } from '../../shared/constants';
 
+const streamDefaults = (settings: AppSettings): Partial<StreamConfig> => ({
+  codec: settings.stream.defaultCodec,
+  fps: settings.stream.defaultFps === 120 ? 120 : settings.stream.defaultFps === 60 ? 60 : 30,
+  bitrate: settings.stream.defaultBitrate,
+  hardwareEncoding: settings.stream.hardwareEncoding,
+  audioSource: settings.audio.defaultSource,
+});
+
 interface MasterState {
   serverStatus: 'stopped' | 'running';
   streamStatus: StreamStatus;
   settings: AppSettings;
+  settingsLoaded: boolean;
   screens: ScreenSource[];
   connectedAgents: Agent[];
   selectedScreen: ScreenSource | null;
@@ -39,6 +48,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
   serverStatus: 'stopped',
   streamStatus: 'idle',
   settings: DEFAULT_SETTINGS,
+  settingsLoaded: false,
   screens: [],
   connectedAgents: [],
   selectedScreen: null,
@@ -51,7 +61,9 @@ export const useMasterStore = create<MasterState>((set, get) => ({
   loadSettings: async () => {
     try {
       const settings = await window.screenflow.getSettings();
-      set({ settings });
+      set(state => ({ settings, settingsLoaded: true, streamConfig: state.settingsLoaded ? state.streamConfig : {
+        ...state.streamConfig, ...streamDefaults(settings),
+      } }));
     } catch (err) {
       console.error('Failed to load settings:', err);
     }
@@ -60,9 +72,12 @@ export const useMasterStore = create<MasterState>((set, get) => ({
   updateSettings: async (settings) => {
     try {
       await window.screenflow.saveSettings(settings);
-      set({ settings });
+      set(state => ({ settings, settingsLoaded: true, streamConfig: {
+        ...state.streamConfig, ...streamDefaults(settings),
+      } }));
     } catch (err) {
       console.error('Failed to save settings:', err);
+      throw err;
     }
   },
 

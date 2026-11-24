@@ -1,4 +1,4 @@
-# SpaceViewer v2.2.16
+# SpaceViewer v3.0.0
 # ============================================================
 # SpaceViewer — NSIS Custom Install Actions
 # Writes the install-mode.json based on installer selection.
@@ -13,24 +13,22 @@
   Var RadioAgent
   Var RadioBoth
   Var SelectedMode
-  Var InstallAudio
-  Var InstallAudioSelected
 !endif
 
 !macro customInit
-  StrCpy $InstallAudioSelected "1"
   UserInfo::GetAccountType
   Pop $0
   ${If} $0 != "admin"
-    # Auto-elevar com UAC para garantir instalacao dos drivers de video virtual
+    # Auto-elevar com UAC para garantir instalacao do driver de tela virtual
     ExecShell "runas" "$EXEPATH" "$CMDLINE"
     Quit
   ${EndIf}
 
-  # Fechar instancias ativas do SpaceViewer e SpaceviwerStream para permitir atualizacao in-place sem travar arquivos
+  # Fechar instancias ativas (inclui o host GameStream de versoes anteriores) para atualizar sem travar arquivos
   nsExec::Exec 'taskkill /F /IM SpaceViewer.exe /T'
   nsExec::Exec 'taskkill /F /IM SpaceviwerStream.exe /T'
   nsExec::Exec 'taskkill /F /IM SpaceviwerStreamDisplayCtl.exe /T'
+  nsExec::Exec 'taskkill /F /IM sunshine.exe /T'
 
   !ifndef BUILD_UNINSTALLER
     StrCpy $SelectedMode "both"
@@ -61,33 +59,23 @@ Function showInstallModePage
     Abort
   ${EndIf}
 
-  ${NSD_CreateLabel} 0 0 100% 24u "Selecione o modo de instalacao do SpaceViewer. O Agente sera executado em segundo plano e podera ser controlado pela barra de tarefas."
+  ${NSD_CreateLabel} 0 0 100% 24u "Selecione o modo de instalacao do SpaceViewer. Tablets e celulares usam o app SpaceViewer Display (APK) como tela extra."
   Pop $Label
 
   ${NSD_CreateRadioButton} 10u 30u 80% 15u "Instalar Master + Agente (Recomendado - permite transmitir e receber)"
   Pop $RadioBoth
   ${NSD_Check} $RadioBoth
 
-  ${NSD_CreateRadioButton} 10u 50u 80% 15u "Instalar apenas o Master (Computador principal que transmite a tela)"
+  ${NSD_CreateRadioButton} 10u 50u 80% 15u "Instalar apenas o Master (Computador principal que estende/espelha a tela)"
   Pop $RadioMaster
 
-  ${NSD_CreateRadioButton} 10u 70u 80% 15u "Instalar apenas o Agente (Dispositivo que servira como tela secundaria)"
+  ${NSD_CreateRadioButton} 10u 70u 80% 15u "Instalar apenas o Agente (PC que servira como tela secundaria)"
   Pop $RadioAgent
-
-  ${NSD_CreateCheckBox} 10u 94u 90% 34u "Instalar VB-CABLE da VB-Audio (donationware) agora. Origem: vb-cable.com. Doacoes sao bem-vindas; uso profissional exige licenca: vb-audio.com/Services/licensing.htm."
-  Pop $InstallAudio
-  ${NSD_Check} $InstallAudio
 
   nsDialogs::Show
 FunctionEnd
 
 Function leaveInstallModePage
-  ${NSD_GetState} $InstallAudio $0
-  ${If} $0 == ${BST_CHECKED}
-    StrCpy $InstallAudioSelected "1"
-  ${Else}
-    StrCpy $InstallAudioSelected "0"
-  ${EndIf}
   ${NSD_GetState} $RadioMaster $0
   ${If} $0 == ${BST_CHECKED}
     StrCpy $SelectedMode "master"
@@ -103,9 +91,11 @@ FunctionEnd
 !endif
 
 !macro customInstall
+  # Machine-wide: with the 'all' context $APPDATA is C:\ProgramData, shared by every user.
+  SetShellVarContext all
   CreateDirectory "$APPDATA\SpaceViewer"
   FileOpen $0 "$APPDATA\SpaceViewer\install-mode.json" "w"
-  
+
   # Ensure SelectedMode is not empty (for silent installs)
   !ifndef BUILD_UNINSTALLER
     ${If} $SelectedMode == ""
@@ -115,67 +105,70 @@ FunctionEnd
   !else
     FileWrite $0 '{"mode":"both"}'
   !endif
-  
+
   FileClose $0
 
-  ${If} $InstallAudioSelected == "1"
-    ${If} $SelectedMode != "agent"
-      DetailPrint "Instalando o VB-CABLE oficial da VB-Audio..."
-      nsExec::ExecToLog 'powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\resources\spaceviwerstream\install-audio.ps1" -Bundled'
-      Pop $1
-      ${If} $1 != 0
-        DetailPrint "O SpaceViewer foi instalado, mas o VB-CABLE nao pode ser ativado. Tente novamente pelo painel de audio."
-      ${EndIf}
-    ${EndIf}
-  ${EndIf}
+  # Remover restos do Sunshine / host Moonlight de versoes anteriores
+  RMDir /r "$INSTDIR\resources\sunshine"
+  Delete "$INSTDIR\resources\spaceviwerstream\SpaceviwerStream.exe"
+  Delete "$INSTDIR\resources\spaceviwerstream\install-audio.ps1"
+  Delete "$INSTDIR\resources\spaceviwerstream\migrate-host.ps1"
 
-  # Monitor creation is controlled by the interface and preserves the user's count.
-  # Stop the superseded standalone host so the integrated server can bind its ports.
-  nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\resources\spaceviwerstream\migrate-host.ps1"'
-
-  # Configurar regras de Firewall para GameStream, Descoberta Multicast e SpaceViewer
-  DetailPrint "Configurando regras de firewall para descoberta de rede e Moonlight..."
+  DetailPrint "Configurando regras de firewall para as telas sem fio..."
+  # Regras antigas (Sunshine / GameStream / Moonlight)
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream TCP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream UDP"'
-  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer App TCP"'
-  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer App UDP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer Sunshine TCP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer Sunshine UDP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer GameStream Ports TCP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer GameStream Ports UDP"'
+  # Regras atuais (recriadas)
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer App TCP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer App UDP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer Discovery UDP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer WebRTC TCP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer Display Discovery UDP"'
 
-  # Liberar executavel principal SpaceViewer
+  # Executavel principal (WebRTC usa portas UDP dinamicas)
   nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer App TCP" dir=in action=allow profile=any program="$INSTDIR\SpaceViewer.exe" enable=yes'
   nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer App UDP" dir=in action=allow profile=any program="$INSTDIR\SpaceViewer.exe" enable=yes'
 
-  # Liberar portas do SpaceviwerStream (GameStream para Moonlight)
-  ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\SpaceviwerStream.exe"
-    nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream TCP" dir=in action=allow profile=any protocol=TCP localport=47984-48010 program="$INSTDIR\resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes'
-    nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer SpaceviwerStream UDP" dir=in action=allow profile=any protocol=UDP localport=47984-48010 program="$INSTDIR\resources\spaceviwerstream\SpaceviwerStream.exe" enable=yes'
-  ${EndIf}
-  nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer GameStream Ports TCP" dir=in action=allow profile=any protocol=TCP localport=47984-48010 enable=yes'
-  nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer GameStream Ports UDP" dir=in action=allow profile=any protocol=UDP localport=47984-48010 enable=yes'
-
-  # Liberar portas de descoberta mDNS (5353) e SSDP (1900)
+  # Descoberta mDNS (5353), SSDP (1900) e dos aparelhos SpaceViewer Display (47810 / 47812)
   nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer Discovery UDP" dir=in action=allow profile=any protocol=UDP localport=5353,1900 enable=yes'
+  nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer Display Discovery UDP" dir=in action=allow profile=any protocol=UDP localport=47810,47812 enable=yes'
 
-  # Liberar portas WebRTC LAN (7523 e 7524)
+  # Sinalizacao WebRTC e download do APK (7523) e agente PC (7524)
   nsExec::Exec 'netsh advfirewall firewall add rule name="SpaceViewer WebRTC TCP" dir=in action=allow profile=any protocol=TCP localport=7523,7524 enable=yes'
 
   # Configurar perfil de rede como Particular (Privada) e habilitar servicos de descoberta
   DetailPrint "Habilitando descoberta de rede e configurando perfil privado..."
   nsExec::Exec 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetConnectionProfile | Where-Object { $$_.NetworkCategory -eq \"Public\" } | Set-NetConnectionProfile -NetworkCategory Private -ErrorAction SilentlyContinue"'
   nsExec::Exec 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Service FDResPub, FDPHost, SSDPSRV, upnphost -ErrorAction SilentlyContinue"'
+
+  ${If} $SelectedMode != "agent"
+    DetailPrint "Instalando o driver de tela estendida..."
+    nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\resources\spaceviwerstream\display-manager.ps1" -Action install -Count 4'
+    Pop $1
+    ${If} $1 != 0
+      DetailPrint "Aviso: Nao foi possivel instalar o driver de tela estendida durante a instalacao (codigo $1)."
+    ${EndIf}
+  ${EndIf}
 !macroend
 
 !macro customUnInstall
+  nsExec::Exec 'schtasks /Delete /F /TN "SpaceViewer"'
   ${If} ${FileExists} "$INSTDIR\resources\spaceviwerstream\display-manager.ps1"
     nsExec::ExecToLog 'powershell -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\resources\spaceviwerstream\display-manager.ps1" -Action remove'
   ${EndIf}
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream TCP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer SpaceviwerStream UDP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer Sunshine TCP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer Sunshine UDP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer GameStream Ports TCP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer GameStream Ports UDP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer App TCP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer App UDP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer Discovery UDP"'
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer Display Discovery UDP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SpaceViewer WebRTC TCP"'
 !macroend

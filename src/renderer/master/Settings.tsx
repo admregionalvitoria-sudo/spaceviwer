@@ -1,14 +1,15 @@
 // SpaceViewer v2.2.9
 import React, { useState, useEffect } from 'react';
+import { NetworkMonitor } from './NetworkMonitor';
 import { useMasterStore } from '../stores/masterStore';
 import { GlassCard } from '../components/ui/GlassCard';
 import { Toggle } from '../components/ui/Toggle';
-import type { AppSettings, VideoCodec, AudioSource, UpdateInfo, UpdateProgress } from '../../shared/types';
-import { APP_VERSION } from '../../shared/constants';
+import type { AppSettings, VideoCodec, AudioSource, UpdateInfo, UpdateProgress, DisplayQuality, DisplaySettings, QualityPreset, DisplayTransport } from '../../shared/types';
+import { APP_VERSION, DEFAULT_SETTINGS, QUALITY_PRESET_LABELS, SUPPORTED_DISPLAY_FPS, PRESET_FPS_OPTIONS, MIN_BITRATE_KBPS, MAX_BITRATE_KBPS, resolveQuality } from '../../shared/constants';
 
 export const Settings: React.FC = () => {
   const { settings, updateSettings, loadSettings } = useMasterStore();
-  const [activeTab, setActiveTab] = useState<'server' | 'stream' | 'audio' | 'system' | 'update'>('server');
+  const [activeTab, setActiveTab] = useState<'displays' | 'server' | 'stream' | 'audio' | 'system' | 'network' | 'update'>('displays');
 
   // Auto-update states
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
@@ -40,7 +41,17 @@ export const Settings: React.FC = () => {
   const [minimizeToTray, setMinimizeToTray] = useState(settings.startup.minimizeToTray);
   const [language, setLanguage] = useState(settings.ui.language);
 
+  const displayDefaults = settings.display ?? DEFAULT_SETTINGS.display;
+  const [displayTransport, setDisplayTransport] = useState<DisplayTransport>(displayDefaults.transport ?? DEFAULT_SETTINGS.display.transport);
+  const [totalBitrateKbps, setTotalBitrateKbps] = useState<number>(displayDefaults.totalBitrateKbps ?? DEFAULT_SETTINGS.display.totalBitrateKbps);
+  const [displayQuality, setDisplayQuality] = useState<DisplayQuality>(displayDefaults.quality);
+  const [displayAudio, setDisplayAudio] = useState(displayDefaults.audio ?? DEFAULT_SETTINGS.display.audio);
+  const [keepVirtualDisplays, setKeepVirtualDisplays] = useState(displayDefaults.keepVirtualDisplays);
+  const [autoReconnect, setAutoReconnect] = useState(displayDefaults.autoReconnect);
+
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -140,10 +151,24 @@ export const Settings: React.FC = () => {
     setLaunchWithWindows(settings.startup.launchWithWindows);
     setMinimizeToTray(settings.startup.minimizeToTray);
     setLanguage(settings.ui.language);
+    const display = settings.display ?? DEFAULT_SETTINGS.display;
+    setDisplayTransport(display.transport ?? DEFAULT_SETTINGS.display.transport);
+    setTotalBitrateKbps(display.totalBitrateKbps ?? DEFAULT_SETTINGS.display.totalBitrateKbps);
+    setDisplayQuality(display.quality);
+    setDisplayAudio(display.audio ?? DEFAULT_SETTINGS.display.audio);
+    setKeepVirtualDisplays(display.keepVirtualDisplays);
+    setAutoReconnect(display.autoReconnect);
   }, [settings]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+    setSaveSuccess(false);
+    setSaveError('');
+    if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+      setSaveError('Informe uma porta entre 1024 e 65535.');
+      return;
+    }
 
     const updated: AppSettings = {
       server: {
@@ -177,18 +202,33 @@ export const Settings: React.FC = () => {
         language,
         compactMode: settings.ui.compactMode,
       },
+      display: {
+        transport: displayTransport,
+        totalBitrateKbps,
+        quality: displayQuality,
+        audio: displayAudio,
+        keepVirtualDisplays,
+        autoReconnect,
+      },
     };
 
-    await updateSettings(updated);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setIsSaving(true);
+    try {
+      await updateSettings(updated);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar. Tente novamente.');
+    } finally { setIsSaving(false); }
   };
 
   const tabs: { id: typeof activeTab; label: string }[] = [
+    { id: 'displays', label: 'Telas sem fio' },
     { id: 'server', label: 'Servidor' },
     { id: 'stream', label: 'Transmissão' },
     { id: 'audio', label: 'Áudio' },
     { id: 'system', label: 'Sistema' },
+    { id: 'network', label: 'Rede' },
     { id: 'update', label: 'Atualização' },
   ];
 
@@ -196,16 +236,21 @@ export const Settings: React.FC = () => {
     <div className="flex-1 p-6 space-y-6 overflow-y-auto h-full select-none bg-bg-space text-neutral-900">
       {/* Header */}
       <div className="border-b border-neutral-200/60 pb-4">
-        <h2 className="font-display font-extrabold text-xl text-neutral-900 tracking-wide uppercase">Configurações</h2>
+        <h2 className="font-display font-semibold text-xl text-neutral-900 tracking-tight">Opções</h2>
         <p className="text-xs text-neutral-500 mt-1">Ajuste os parâmetros de rede, qualidade de áudio e vídeo do SpaceViewer.</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-6 items-start">
         {/* Tab List */}
-        <div className="w-full md:w-48 flex md:flex-col space-x-2 md:space-x-0 md:space-y-1.5 overflow-x-auto border-b md:border-b-0 md:border-r border-neutral-200/60 pb-3 md:pb-0 md:pr-4">
+        <div role="tablist" aria-label="Opções" className="w-full md:w-48 shrink-0 flex md:flex-col space-x-2 md:space-x-0 md:space-y-1.5 overflow-x-auto border-b md:border-b-0 md:border-r border-neutral-200/60 pb-3 md:pb-0 md:pr-4">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              type="button"
+              role="tab"
+              id={`options-tab-${tab.id}`}
+              aria-selected={activeTab === tab.id}
+              aria-controls="options-panel"
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider text-left transition-all duration-200 ${
                 activeTab === tab.id
@@ -219,9 +264,26 @@ export const Settings: React.FC = () => {
         </div>
 
         {/* Tab Content Box */}
-        <div className="flex-1 w-full max-w-xl">
-          <form onSubmit={handleSave} className="space-y-6">
+        <div className="flex-1 min-w-0 w-full max-w-4xl" id="options-panel" role="tabpanel" aria-labelledby={`options-tab-${activeTab}`}>
+          {activeTab === 'network' ? <NetworkMonitor embedded /> : <form onSubmit={handleSave} className="space-y-5">
             <GlassCard className="p-6">
+              {activeTab === 'displays' && (
+                <DisplayQualitySection
+                  transport={displayTransport}
+                  onTransportChange={setDisplayTransport}
+                  totalBitrateKbps={totalBitrateKbps}
+                  onTotalBitrateKbpsChange={setTotalBitrateKbps}
+                  quality={displayQuality}
+                  onChange={(patch) => setDisplayQuality((q) => ({ ...q, ...patch }))}
+                  audio={displayAudio}
+                  onAudioChange={(patch) => setDisplayAudio((a) => ({ ...a, ...patch }))}
+                  keepVirtualDisplays={keepVirtualDisplays}
+                  onKeepVirtualDisplays={setKeepVirtualDisplays}
+                  autoReconnect={autoReconnect}
+                  onAutoReconnect={setAutoReconnect}
+                />
+              )}
+
               {activeTab === 'server' && (
                 <div className="space-y-4">
                   <h3 className="font-display font-bold text-sm text-neutral-900 mb-3 uppercase tracking-wider">Ajustes do Servidor</h3>
@@ -230,6 +292,9 @@ export const Settings: React.FC = () => {
                       <label className="block font-mono text-[10px] text-neutral-500 uppercase mb-1.5">Porta WebSocket</label>
                       <input
                         type="number"
+                        min={1024}
+                        max={65535}
+                        required
                         value={port}
                         onChange={(e) => setPort(parseInt(e.target.value, 10))}
                         className="w-full bg-white border border-neutral-300 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-950 rounded-xl px-3 py-2 text-sm text-neutral-900 outline-none"
@@ -272,6 +337,7 @@ export const Settings: React.FC = () => {
 
               {activeTab === 'stream' && (
                 <div className="space-y-4">
+                  <p className="text-xs text-neutral-500">Padrões dos receptores SpaceViewer para PC (WebRTC). A qualidade dos tablets e celulares fica em Telas sem fio.</p>
                   <h3 className="font-display font-bold text-sm text-neutral-900 mb-3 uppercase tracking-wider">Padrões de Transmissão</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -662,16 +728,237 @@ export const Settings: React.FC = () => {
                 )}
                 <button
                   type="submit"
+                  disabled={isSaving}
                   className="btn-primary-white px-6 py-2.5 rounded-xl text-sm font-bold font-mono tracking-wide active:scale-[0.98] transition duration-150 cursor-pointer shadow-md"
                 >
-                  Salvar Configurações
+                  {isSaving ? 'Salvando…' : 'Salvar configurações'}
                 </button>
               </div>
             )}
-          </form>
+            {saveError && <p role="alert" className="text-sm text-rose-700">{saveError}</p>}
+          </form>}
         </div>
       </div>
     </div>
   );
 };
+
+const fieldLabel = 'block font-mono text-[10px] text-neutral-500 uppercase mb-1.5';
+const fieldInput = 'w-full bg-white border border-neutral-300 focus:border-neutral-900 rounded-xl px-3 py-2 text-sm text-neutral-900 outline-none';
+
+/** Global resolution / FPS / bitrate for Android receivers (per-device overrides live in Telas). */
+const DisplayQualitySection: React.FC<{
+  transport: DisplayTransport;
+  onTransportChange: (transport: DisplayTransport) => void;
+  totalBitrateKbps: number;
+  onTotalBitrateKbpsChange: (total: number) => void;
+  quality: DisplayQuality;
+  onChange: (patch: Partial<DisplayQuality>) => void;
+  audio: DisplaySettings['audio'];
+  onAudioChange: (patch: Partial<DisplaySettings['audio']>) => void;
+  keepVirtualDisplays: boolean;
+  onKeepVirtualDisplays: (value: boolean) => void;
+  autoReconnect: boolean;
+  onAutoReconnect: (value: boolean) => void;
+}> = ({ transport, onTransportChange, totalBitrateKbps, onTotalBitrateKbpsChange, quality, onChange, audio, onAudioChange, keepVirtualDisplays, onKeepVirtualDisplays, autoReconnect, onAutoReconnect }) => {
+  const custom = quality.preset === 'custom';
+  const choosePreset = (preset: QualityPreset) => {
+    if (preset === 'custom' || preset === 'native') onChange({ preset });
+    else {
+      // The preset sets size and bitrate; the chosen frame rate (30 or 60) is kept.
+      const resolved = resolveQuality({ ...quality, preset });
+      onChange({ preset, width: resolved.width, height: resolved.height, fps: resolved.fps, bitrateKbps: resolved.bitrateKbps });
+    }
+  };
+  const chooseFps = (fps: number) => {
+    if (quality.preset === 'custom') onChange({ fps });
+    else {
+      const resolved = resolveQuality({ ...quality, fps });
+      onChange({ fps: resolved.fps, bitrateKbps: resolved.bitrateKbps });
+    }
+  };
+  const resolvedSummary = resolveQuality(quality);
+  const summary = quality.preset === 'native'
+    ? `Resolução do próprio aparelho a ${quality.fps === 30 ? 30 : 60} fps (limitado à tela dele); bitrate calculado automaticamente.`
+    : `${resolvedSummary.width}×${resolvedSummary.height} · ${resolvedSummary.fps} fps · ${(resolvedSummary.bitrateKbps / 1000).toFixed(0)} Mbps`;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="font-display font-bold text-sm text-neutral-900 uppercase tracking-wider">Qualidade das telas sem fio</h3>
+        <p className="text-xs text-neutral-500 mt-1">
+          Vale para todos os tablets e celulares com o SpaceViewer Display. Em Telas você pode escolher outra qualidade para um aparelho específico.
+          Em modo Estender a tela estendida é criada nesta resolução.
+        </p>
+      </div>
+
+      <div>
+        <label className={fieldLabel} htmlFor="dq-transport">Modo de transmissão</label>
+        <select
+          id="dq-transport"
+          className={fieldInput}
+          value={transport}
+          onChange={(e) => onTransportChange(e.target.value as DisplayTransport)}
+        >
+          <option value="webrtc">WebRTC (padrão — qualidade e fluidez)</option>
+          <option value="native">Tempo real (nativo GPU)</option>
+        </select>
+        <p className="text-[11px] text-neutral-500 mt-1">
+          {transport === 'webrtc'
+            ? 'Mantém a qualidade de vídeo e fluidez com adaptação automática de rede e reconexão contra travamentos.'
+            : 'Captura e codificação na GPU do computador (TCP 47813). Usa WebRTC automaticamente como reserva se o aparelho não suportar.'}
+        </p>
+      </div>
+
+      <div>
+        <label className={fieldLabel} htmlFor="dq-total-bitrate">Banda total para todas as TVs</label>
+        <select
+          id="dq-total-bitrate"
+          className={fieldInput}
+          value={totalBitrateKbps}
+          onChange={(e) => onTotalBitrateKbpsChange(Number(e.target.value))}
+        >
+          <option value={10000}>10 Mbps</option>
+          <option value={15000}>15 Mbps</option>
+          <option value={20000}>20 Mbps (padrão)</option>
+          <option value={30000}>30 Mbps</option>
+          <option value={50000}>50 Mbps</option>
+        </select>
+        <p className="text-[11px] text-neutral-500 mt-1">
+          Dividida entre as TVs conectadas. Em Wi-Fi fraco use 10–15 Mbps.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2" role="radiogroup" aria-label="Predefinição de qualidade">
+        {(['economy', 'balanced', 'high', 'ultra', 'native', 'custom'] as QualityPreset[]).map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            role="radio"
+            aria-checked={quality.preset === preset}
+            onClick={() => choosePreset(preset)}
+            className={`rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition ${quality.preset === preset ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-50'}`}
+          >
+            {QUALITY_PRESET_LABELS[preset]}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-neutral-600">{summary}</p>
+
+      {custom && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <label className={fieldLabel} htmlFor="dq-width">Largura</label>
+            <input id="dq-width" type="number" min={640} max={3840} step={2} className={fieldInput} value={quality.width}
+              onChange={(e) => onChange({ width: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className={fieldLabel} htmlFor="dq-height">Altura</label>
+            <input id="dq-height" type="number" min={360} max={2560} step={2} className={fieldInput} value={quality.height}
+              onChange={(e) => onChange({ height: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className={fieldLabel} htmlFor="dq-fps">FPS</label>
+            <select id="dq-fps" className={fieldInput} value={quality.fps} onChange={(e) => onChange({ fps: Number(e.target.value) })}>
+              {SUPPORTED_DISPLAY_FPS.map((fps) => <option key={fps} value={fps}>{fps} fps</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={fieldLabel} htmlFor="dq-bitrate">Bitrate: {(quality.bitrateKbps / 1000).toFixed(0)} Mbps</label>
+            <input id="dq-bitrate" type="range" min={MIN_BITRATE_KBPS} max={MAX_BITRATE_KBPS} step={1000} className="w-full accent-neutral-900"
+              value={quality.bitrateKbps} onChange={(e) => onChange({ bitrateKbps: Number(e.target.value) })} />
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className={fieldLabel} htmlFor="dq-priority">Prioridade</label>
+          <select id="dq-priority" className={fieldInput} value={quality.priority} onChange={(e) => onChange({ priority: e.target.value as DisplayQuality['priority'] })}>
+            <option value="smoothness">Fluidez — menor atraso do mouse (recomendado)</option>
+            <option value="balanced">Equilibrada</option>
+            <option value="sharpness">Nitidez — textos (pode reduzir o fps)</option>
+          </select>
+        </div>
+        <div>
+          <label className={fieldLabel} htmlFor="dq-codec">Codec</label>
+          <select id="dq-codec" className={fieldInput} value={quality.codec} onChange={(e) => onChange({ codec: e.target.value as DisplayQuality['codec'] })}>
+            <option value="H264">H.264 (recomendado, decodificação por hardware)</option>
+            <option value="VP9">VP9 (melhor imagem, exige mais do aparelho)</option>
+            <option value="VP8">VP8 (compatibilidade)</option>
+          </select>
+        </div>
+        <div>
+          <label className={fieldLabel} htmlFor="dq-orientation">Orientação no aparelho</label>
+          <select id="dq-orientation" className={fieldInput} value={quality.orientation} onChange={(e) => onChange({ orientation: e.target.value as DisplayQuality['orientation'] })}>
+            <option value="landscape">Paisagem</option>
+            <option value="portrait">Retrato</option>
+            <option value="auto">Automática (sensor)</option>
+          </select>
+        </div>
+      </div>
+
+      {!custom && (
+        <div>
+          <label className={fieldLabel} htmlFor="dq-fps-preset">Quadros por segundo</label>
+          <div className="flex gap-2" id="dq-fps-preset" role="radiogroup" aria-label="Quadros por segundo">
+            {PRESET_FPS_OPTIONS.map((fps) => (
+              <button key={fps} type="button" role="radio" aria-checked={(quality.fps === 30 ? 30 : 60) === fps} onClick={() => chooseFps(fps)}
+                className={`rounded-lg border px-4 py-1.5 text-xs font-semibold ${(quality.fps === 30 ? 30 : 60) === fps ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white text-neutral-700'}`}>
+                {fps} fps
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-neutral-500 mt-1">60 fps deixa o mouse e os vídeos mais fluidos. 30 fps usa cerca de 1/3 menos banda e alivia Wi-Fi fraco ou TVs mais simples.</p>
+        </div>
+      )}
+
+      <div className="space-y-3 border-t border-neutral-200 pt-4">
+        <div>
+          <h4 className="font-display font-bold text-xs text-neutral-900 uppercase tracking-wider">Áudio</h4>
+          <p className="text-[11px] text-neutral-500 mt-0.5">
+            Transmite o som do sistema do computador em estéreo (Opus) para os aparelhos conectados.
+          </p>
+        </div>
+        <Toggle
+          checked={audio.enabled}
+          onChange={(enabled) => onAudioChange({ enabled })}
+          label="Transmitir o som do PC para os aparelhos"
+        />
+        {audio.enabled && (
+          <div className="max-w-xs">
+            <label className={fieldLabel} htmlFor="dq-audio-bitrate">Qualidade do som</label>
+            <select
+              id="dq-audio-bitrate"
+              className={fieldInput}
+              value={audio.bitrateKbps}
+              onChange={(e) => onAudioChange({ bitrateKbps: Number(e.target.value) as 96 | 128 | 192 | 256 })}
+            >
+              <option value={96}>96 kbps (economia)</option>
+              <option value={128}>128 kbps (padrão)</option>
+              <option value={192}>192 kbps (alta qualidade)</option>
+              <option value={256}>256 kbps (máxima fidelidade)</option>
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1 border-t border-neutral-200 pt-4">
+        <Toggle checked={autoReconnect} onChange={onAutoReconnect} label="Reconectar automaticamente aparelhos já configurados quando aparecerem na rede" />
+        <Toggle checked={keepVirtualDisplays} onChange={onKeepVirtualDisplays} label="Manter o monitor estendido ao desconectar" />
+      </div>
+
+      <div className="border-t border-neutral-200 pt-4">
+        <button
+          type="button"
+          className="btn-secondary px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer border border-neutral-300 hover:bg-neutral-50 text-neutral-800 transition"
+          onClick={() => window.screenflow?.openDiagnosticsFolder?.()}
+        >
+          Abrir pasta de diagnóstico
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default Settings;

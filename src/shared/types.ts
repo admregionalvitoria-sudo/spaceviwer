@@ -1,6 +1,6 @@
-// SpaceViewer v2.2.9
+// SpaceViewer v3.1.0
 // ============================================================
-// ScreenFlow — Shared Type Definitions
+// SpaceViewer — Shared Type Definitions
 // ============================================================
 
 export type InstallMode = 'master' | 'agent' | 'both';
@@ -10,8 +10,6 @@ export type TransmissionMode = 'mirror' | 'extend' | 'cast';
 export type VideoCodec = 'H264' | 'H265' | 'VP8' | 'VP9' | 'AV1';
 export type AudioSource = 'system' | 'microphone' | 'both';
 export type Protocol = 'webrtc' | 'miracast' | 'auto';
-export type SunshineStatus = 'not_installed' | 'stopped' | 'running' | 'checking';
-export type GameStreamStatus = 'stopped' | 'running' | 'error';
 
 export interface ScreenSource {
   id: string;
@@ -125,6 +123,160 @@ export interface AppSettings {
     language: 'pt-BR' | 'en' | 'es';
     compactMode: boolean;
   };
+  display: DisplaySettings;
+}
+
+// ============================================================
+// Extended / mirrored displays on Android receivers
+// (contract: docs/ARQUITETURA-TELA-ESTENDIDA.md)
+// ============================================================
+
+export type ReceiverMode = 'extend' | 'mirror';
+export type QualityPreset = 'economy' | 'balanced' | 'high' | 'ultra' | 'native' | 'custom';
+export type QualityPriority = 'sharpness' | 'balanced' | 'smoothness';
+export type ReceiverOrientation = 'landscape' | 'portrait' | 'auto';
+export type DisplayCodec = 'H264' | 'VP9' | 'VP8';
+export type DisplayTransport = 'native' | 'webrtc';
+
+export interface DisplayQuality {
+  preset: QualityPreset;
+  width: number;
+  height: number;
+  fps: number;
+  bitrateKbps: number;
+  codec: DisplayCodec;
+  priority: QualityPriority;
+  orientation: ReceiverOrientation;
+}
+
+export interface DisplaySettings {
+  transport: DisplayTransport;
+  quality: DisplayQuality;
+  audio: { enabled: boolean; bitrateKbps: 96 | 128 | 192 | 256 };
+  totalBitrateKbps: number;
+  keepVirtualDisplays: boolean;
+  autoReconnect: boolean;
+}
+
+/** DeviceInfo JSON published by the APK (UDP 47810/47812 and GET /info). */
+export interface DeviceInfo {
+  type: 'spaceviewer-display';
+  protocol: number;
+  id: string;
+  name: string;
+  model: string;
+  manufacturer: string;
+  android: string;
+  appVersion: string;
+  ip: string;
+  ips?: string[];
+  controlPort: number;
+  streamPort?: number;
+  capabilities?: string[];
+  width: number;
+  height: number;
+  refreshRate: number;
+  density: number;
+  orientation: ReceiverOrientation;
+  state: 'idle' | 'connecting' | 'streaming';
+  connectedTo: string | null;
+}
+
+export interface ReceiverAssignment {
+  mode: ReceiverMode;
+  /** Electron display id to mirror (mode "mirror"). Empty = primary display. */
+  sourceDisplayId?: string;
+  /** Per-device quality override; falls back to AppSettings.display.quality. */
+  quality?: DisplayQuality | null;
+  /** Per-device audio override; null/undefined falls back to AppSettings.display.audio. */
+  audio?: boolean | null;
+  autoConnect: boolean;
+}
+
+export type ReceiverSessionStatus = 'preparing' | 'connecting' | 'streaming' | 'error';
+
+export interface ReceiverSession {
+  sessionId: string;
+  agentId?: string;
+  mode: ReceiverMode;
+  transport?: DisplayTransport;
+  encoder?: string;
+  decoder?: string;
+  /** Electron display id being captured for this receiver. */
+  displayId?: string;
+  /** Windows device name of the reserved virtual display (mode "extend"). */
+  virtualDeviceName?: string;
+  label: string;
+  status: ReceiverSessionStatus;
+  error?: string;
+  quality: DisplayQuality;
+  audio: boolean;
+}
+
+export interface ReceiverStats {
+  fps: number;
+  mbps: number;
+  rttMs: number;
+  width: number;
+  height: number;
+  packetsLost: number;
+  jitterMs: number;
+  bufferMs?: number;
+  queueMs?: number;
+  bitrateKbps?: number;
+}
+
+export interface DisplayReceiver extends DeviceInfo {
+  lastSeen: number;
+  online: boolean;
+  source: 'udp' | 'mdns' | 'manual';
+  assignment: ReceiverAssignment;
+  session?: ReceiverSession | null;
+  stats?: ReceiverStats | null;
+}
+
+export interface PcDisplay {
+  /** Electron display id. */
+  id: string;
+  /** Windows device name, e.g. \\.\DISPLAY3 (empty when unknown). */
+  deviceName: string;
+  label: string;
+  bounds: { x: number; y: number; width: number; height: number };
+  /** Physical pixels. */
+  width: number;
+  height: number;
+  refreshRate: number;
+  scaleFactor: number;
+  primary: boolean;
+  virtual: boolean;
+  /** desktopCapturer source id (screen:...). */
+  sourceId: string;
+  thumbnail: string;
+  assignedReceiverIds: string[];
+}
+
+export interface VirtualDriverState {
+  installed: boolean;
+  enabled: boolean;
+  count: number;
+  outputs: number;
+  /** Remote Desktop session: Windows only shows the remote adapter, extended monitors cannot appear. */
+  remoteSession: boolean;
+}
+
+export type DisplayActionResult = { success: boolean; error?: string };
+
+/** Sent by main when a receiver's WebSocket is accepted and the renderer must start streaming. */
+export interface DisplaySessionReady {
+  receiverId: string;
+  agentId: string;
+  sessionId: string;
+  displayId: string;
+  sourceId: string;
+  label: string;
+  mode: ReceiverMode;
+  quality: DisplayQuality;
+  audio: { enabled: boolean; bitrateKbps: number };
 }
 
 export interface SignalingMessage {
@@ -166,86 +318,14 @@ export interface CaptureConfig {
   audioEnabled: boolean;
 }
 
-// ============================================================
-// Moonlight / GameStream (SpaceviwerStream) Integration Types
-// ============================================================
-
-export type DisplayTopologyMode = 'extended' | 'duplicate';
-
-export interface HostDisplayInfo {
-  index: number;
-  name: string;
-  deviceName: string;
-  width: number;
-  height: number;
-  primary: boolean;
-  virtual: boolean;
-}
-
-export interface HostSettings {
-  display: number;
-  width: number;
-  height: number;
-  fps: number;
-  bitrateMbps: number;
-  hardware: boolean;
-  virtualDisplay: boolean;
-}
-
-export interface VirtualDisplayStatus {
-  installed: boolean;
-  active: boolean;
-  enabled?: boolean;
-  count?: number;
-}
+export type DisplayTopologyMode = 'extend' | 'duplicate';
 
 export interface VirtualDisplayState {
   installed: boolean;
   active: boolean;
   enabled: boolean;
   count: number;
-}
-
-/** A Moonlight client that has been paired with this host */
-export interface MoonlightClient {
-  uuid: string;
-  name: string;
-  enabled: boolean;
-}
-
-/** Real-time streaming metrics polled from GameStream host */
-export interface SunshineStreamStats {
-  isStreaming: boolean;
-  fps: number;
-  bitrate: number; // kbps
-  resolution: { width: number; height: number };
-  activeClients: number;
-  encoder: string; // e.g. 'NVENC', 'AMF', 'QuickSync', 'Software'
-  uptime: number; // seconds streaming
-  displayMode?: DisplayTopologyMode;
-}
-
-/** Configuration that SpaceViewer manages */
-export interface SunshineConfig {
-  displayName: string;
-  captureDisplayIndex: number;
-  selectedSourceId: string | null;
-  fps: number;
-  resolution: { width: number; height: number };
-}
-
-/** Discovered Smart TV or Moonlight device on the local network */
-export interface SmartTVDevice {
-  id: string;
-  name: string;
-  ip: string;
-  brand: 'lg' | 'samsung' | 'androidtv' | 'appletv' | 'roku' | 'firetv' | 'moonlight' | 'generic';
-  model?: string;
-  status: 'online' | 'streaming' | 'paired';
-  isMoonlightPaired: boolean;
-  clientUuid?: string;
-  type: 'tv' | 'streaming_box' | 'moonlight_app' | 'console';
-  lastSeen: number;
+  outputs: number;
 }
 
 // Screens & Application Projector Types
@@ -258,7 +338,6 @@ export interface DetailedScreenInfo {
   scaleFactor: number;
   isPrimary: boolean;
   isVirtual: boolean;
-  isMoonlightTarget: boolean;
   thumbnail: string;
   projectedApp?: {
     sourceId: string;
@@ -313,43 +392,33 @@ export interface ScreenFlowAPI {
   connectToMaster: (info: MasterInfo) => Promise<boolean>;
   disconnectFromMaster: () => Promise<void>;
 
-  // Moonlight / GameStream (Native SpaceviwerStream Host)
-  checkSunshine: () => Promise<SunshineStatus>;
-  startGameStream: () => Promise<boolean>;
-  stopGameStream: () => Promise<void>;
-  getGameStreamStatus: () => Promise<GameStreamStatus>;
-  getHostInfo: () => Promise<{ hostname: string; rawHostname: string; ip: string }>;
-  pairMoonlightPin: (pin: string) => Promise<{ success: boolean; error?: string }>;
+  // PC displays (topology & virtual displays)
+  listPcDisplays: () => Promise<PcDisplay[]>;
+  getVirtualDriverState: () => Promise<VirtualDriverState>;
+  installVirtualDriver: () => Promise<DisplayActionResult>;
 
-  // Extended Virtual Display & Native Host Controls
-  getVirtualDisplayStatus: () => Promise<VirtualDisplayStatus>;
-  getVirtualDisplayState: () => Promise<VirtualDisplayState>;
-  setVirtualDisplayCount: (count: number) => Promise<{ success: boolean; count?: number; error?: string }>;
-  addVirtualDisplay: () => Promise<{ success: boolean; count: number; error?: string }>;
-  removeVirtualDisplay: () => Promise<{ success: boolean; count: number; error?: string }>;
-  toggleVirtualDisplays: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
-  installVirtualDisplayDriver: () => Promise<{ success: boolean; error?: string; rebootRequired?: boolean }>;
-  setDisplayMode: (mode: DisplayTopologyMode) => Promise<{ success: boolean; error?: string }>;
-  getHostDisplays: () => Promise<HostDisplayInfo[]>;
-  getNativeSessions: () => Promise<NativeSession[]>;
-  setNativeSessionAudio: (address: string, sourceId: string) => Promise<{ success: boolean; error?: string }>;
-  getNativeAudioStatus: () => Promise<NativeAudioStatus>;
-  installNativeAudio: () => Promise<{ success: boolean; error?: string }>;
-  setNativeSessionDisplay: (address: string, display: number) => Promise<{ success: boolean; error?: string }>;
-  getHostSettings: () => Promise<HostSettings>;
-  setHostSettings: (settings: Partial<HostSettings>) => Promise<{ success: boolean; error?: string }>;
-  refreshHostCapture: () => Promise<{ success: boolean; error?: string }>;
+  setDisplayResolution: (deviceName: string, width: number, height: number, refreshRate: number) => Promise<DisplayActionResult>;
+  setDisplayPosition: (deviceName: string, x: number, y: number) => Promise<DisplayActionResult>;
+  setPrimaryDisplay: (deviceName: string) => Promise<DisplayActionResult>;
   ensureVirtualCursor: () => Promise<{ success: boolean; error?: string }>;
+  restoreNormalCursor: () => Promise<{ success: boolean; error?: string }>;
+  getHostInfo: () => Promise<{ hostname: string; rawHostname: string; ip: string; apkUrl: string | null }>;
 
-  // Screens & Clients
-  getMoonlightScreens: () => Promise<ScreenSource[]>;
-  setMoonlightScreen: (sourceId: string) => Promise<{ success: boolean; error?: string }>;
-  getMoonlightClients: () => Promise<MoonlightClient[]>;
-  getSunshineStreamStats: () => Promise<SunshineStreamStats>;
-  getSunshineConfig: () => Promise<SunshineConfig>;
-  setSunshineConfig: (config: Partial<SunshineConfig>) => Promise<{ success: boolean; error?: string }>;
-  removeMoonlightClient: (uuid: string) => Promise<{ success: boolean; error?: string }>;
-  discoverSmartTVs: () => Promise<SmartTVDevice[]>;
+  // Android receivers (SpaceViewer Display APK)
+  listReceivers: () => Promise<DisplayReceiver[]>;
+  scanReceivers: () => Promise<DisplayReceiver[]>;
+  addReceiverByIp: (ip: string) => Promise<{ success: boolean; error?: string }>;
+  setReceiverAssignment: (id: string, assignment: Partial<ReceiverAssignment>) => Promise<DisplayActionResult>;
+  connectReceiver: (id: string) => Promise<DisplayActionResult>;
+  disconnectReceiver: (id: string) => Promise<DisplayActionResult>;
+  applyReceiversMode: (ids: string[], mode: ReceiverMode, sourceDisplayId?: string) => Promise<DisplayActionResult>;
+  disconnectAllReceivers: () => Promise<DisplayActionResult>;
+  reportReceiverStatus: (receiverId: string, status: 'streaming' | 'error', error?: string) => void;
+  reportReceiverNotice: (receiverId: string, message: string) => void;
+
+  // Native audio
+  sendNativeAudio: (chunk: ArrayBuffer) => void;
+  onNativeAudioState: (cb: (state: { enabled: boolean }) => void) => () => void;
 
   // Shared
   getInstallMode: () => Promise<InstallMode>;
@@ -358,6 +427,7 @@ export interface ScreenFlowAPI {
   getSettings: () => Promise<AppSettings>;
   toggleFullscreen: (state: boolean) => void;
   getAppVersion: () => Promise<string>;
+  openDiagnosticsFolder: () => Promise<{ success: boolean; error?: string }>;
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;
@@ -377,12 +447,11 @@ export interface ScreenFlowAPI {
   onConnectionError: (cb: (err: string) => void) => () => void;
   onMasterDiscovered: (cb: (master: MasterInfo) => void) => () => void;
   onSignalingMessage: (cb: (msg: SignalingMessage) => void) => () => void;
-  onGameStreamStatus: (cb: (status: GameStreamStatus) => void) => () => void;
   onAgentDiscovered: (cb: (agent: any) => void) => () => void;
   onForceConnectToMaster: (cb: (master: MasterInfo) => void) => () => void;
-  onMoonlightStreamStats: (cb: (stats: SunshineStreamStats) => void) => () => void;
-  onSmartTVsUpdated: (cb: (tvs: SmartTVDevice[]) => void) => () => void;
-  onMoonlightPairingRequested: (cb: (info: { name?: string; message?: string }) => void) => () => void;
+  onReceiversUpdated: (cb: (receivers: DisplayReceiver[]) => void) => () => void;
+  onDisplaySessionReady: (cb: (session: DisplaySessionReady) => void) => () => void;
+  onDisplaySessionEnded: (cb: (info: { receiverId: string; agentId: string; reconfigure: boolean }) => void) => () => void;
 }
 
 export interface UpdateInfo {
@@ -411,19 +480,3 @@ declare global {
     screenflow: ScreenFlowAPI;
   }
 }
-
-
-
-export interface NativeSession {
-  audioMode?: 'system' | 'process' | 'none';
-  audioPackets?: number;
-  audioPeak?: number;
-  address: string;
-  display: number;
-  displayKey: string;
-  audioPid: number;
-  audioWindow: string;
-  audioName: string;
-  audioError: string;
-}
-export interface NativeAudioStatus { installed: boolean; redirected: boolean; error: string }

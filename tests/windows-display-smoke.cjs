@@ -12,10 +12,7 @@ app.whenReady().then(async () => {
     });
     assert.equal(typeof inventory.enabled, 'boolean');
     assert.ok(inventory.enabled || inventory.count === 0);
-    const { checkHostStatus } = require('../scratch/gamestream-host.cjs');
-    const hostStatus = await checkHostStatus();
-    assert.ok(['running', 'stopped', 'not_installed'].includes(hostStatus));
-    console.log(JSON.stringify({ installed: inventory.installed, enabled: inventory.enabled, count: inventory.count, matches, hostStatus }));
+    console.log(JSON.stringify({ installed: inventory.installed, enabled: inventory.enabled, count: inventory.count, matches }));
     app.exit(0);
   } catch (error) { console.error(error); app.exit(1); }
 });

@@ -34,6 +34,21 @@ jobs:
       - name: Verify native binaries & dependencies
         run: npm run build:native
 
+      - name: Setup Java 17 (Android receiver build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build Android receiver APK (SpaceViewer Display)
+        env:
+          SPACEVIEWER_APK_KEYSTORE_BASE64: ${{ secrets.SPACEVIEWER_APK_KEYSTORE_BASE64 }}
+          SPACEVIEWER_APK_KEYSTORE_PASSWORD: ${{ secrets.SPACEVIEWER_APK_KEYSTORE_PASSWORD }}
+        run: npm run build:apk
+
+      - name: Fetch FFmpeg binary
+        run: npm run fetch:ffmpeg
+
       - name: Run host regression tests
         run: npm run test:host
 
@@ -49,5 +64,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SpaceViewer-Windows-Installer
-          path: dist-package/*.exe
+          path: |
+            dist-package/*.exe
+            dist-apk/*.apk
           if-no-files-found: error

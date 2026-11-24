@@ -8,6 +8,7 @@
     </gpu>
 	<global>
 		<!--These are global refreshrates, any you add in here, will be replicated to all resolutions-->
+		<g_refresh_rate>30</g_refresh_rate>
 		<g_refresh_rate>60</g_refresh_rate>
 		<g_refresh_rate>90</g_refresh_rate>
 		<g_refresh_rate>120</g_refresh_rate>
@@ -17,7 +18,57 @@
 	</global>
     <resolutions>
         <resolution>
+            <width>1280</width>
+            <height>720</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>1280</width>
+            <height>800</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>1366</width>
+            <height>768</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>1600</width>
+            <height>900</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
             <width>1920</width>
+            <height>1080</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>1920</width>
+            <height>1200</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>2000</width>
+            <height>1200</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>2048</width>
+            <height>1536</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>2160</width>
+            <height>1080</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>2340</width>
+            <height>1080</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>2400</width>
             <height>1080</height>
             <refresh_rate>60</refresh_rate>
         </resolution>
@@ -27,32 +78,65 @@
             <refresh_rate>60</refresh_rate>
         </resolution>
         <resolution>
+            <width>2560</width>
+            <height>1600</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>2732</width>
+            <height>2048</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>2800</width>
+            <height>1752</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>2880</width>
+            <height>1800</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>3200</width>
+            <height>2000</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
             <width>3840</width>
             <height>2160</height>
             <refresh_rate>60</refresh_rate>
         </resolution>
         <resolution>
-            <width>1366</width>
-            <height>768</height>
+            <width>720</width>
+            <height>1280</height>
             <refresh_rate>60</refresh_rate>
         </resolution>
         <resolution>
             <width>800</width>
-            <height>600</height>
+            <height>1280</height>
             <refresh_rate>60</refresh_rate>
         </resolution>
         <resolution>
-            <width>2560</width>
-            <height>1440</height>
-            <refresh_rate>30</refresh_rate>
+            <width>1080</width>
+            <height>1920</height>
+            <refresh_rate>60</refresh_rate>
         </resolution>
         <resolution>
-            <width>3840</width>
-            <height>2160</height>
-            <refresh_rate>30</refresh_rate>
+            <width>1200</width>
+            <height>1920</height>
+            <refresh_rate>60</refresh_rate>
         </resolution>
-    
-        
+        <resolution>
+            <width>1080</width>
+            <height>2400</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>1600</width>
+            <height>2560</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
     </resolutions>
     <options>
 		<CustomEdid>false</CustomEdid> <!-- Custom Edid should be named "user_edid.bin"! This does not support emulating resolutions!-->

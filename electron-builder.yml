@@ -1,4 +1,4 @@
-# SpaceViewer v2.2.16
+# SpaceViewer v3.2.1
 appId: com.spaceviewer.app
 productName: SpaceViewer
 copyright: "© 2026 SpaceViewer"
@@ -14,13 +14,29 @@ directories:
 extraResources:
   - from: resources/spaceviwerstream
     to: spaceviwerstream
+    filter:
+      - '**/*'
+      - '!SpaceviwerStream.exe'
+      - '!install-audio.ps1'
+      - '!migrate-host.ps1'
+      - '!driver/audio{,/**/*}'
+  - from: resources/apk
+    to: apk
+    filter:
+      - '*.apk'
+  - from: resources/ffmpeg
+    to: ffmpeg
+    filter:
+      - 'ffmpeg.exe'
+      - 'LICENSE.txt'
+      - 'SOURCE.txt'
 
 files:
   - out/**/*
 
 win:
   icon: resources/icon.ico
-  requestedExecutionLevel: asInvoker
+  requestedExecutionLevel: requireAdministrator
   target:
     - target: nsis
       arch: [x64]
@@ -42,7 +58,7 @@ linux:
     - deb
     - AppImage
   category: Network
-  description: Screen mirroring and casting over local network
+  description: Extended and mirrored displays on Android tablets and phones over the local network
 
 protocols:
   - name: spaceviewer

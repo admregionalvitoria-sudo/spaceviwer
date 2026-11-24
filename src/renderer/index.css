@@ -2,8 +2,8 @@
 
 @theme {
   --color-bg-space: #F9FAFB;
-  --color-card-space: rgba(228, 228, 231, 0.85);
-  --color-card-light: rgba(228, 228, 231, 0.55);
+  --color-card-space: #ffffff;
+  --color-card-light: #fafafa;
   --color-border-space: rgba(0, 0, 0, 0.14);
   
   /* Map brand colors to monochrome shades to gracefully handle any leftover variables in light mode */
@@ -23,6 +23,23 @@ html, body {
   color: #111827;
   font-family: var(--font-sans);
   overflow: hidden;
+}
+
+button:not(:disabled), select:not(:disabled), input[type="range"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid #525252;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Custom Scrollbars */
@@ -55,22 +72,18 @@ html, body {
 
 /* Glassmorphism Styles (Light Mode) */
 .glass-panel {
-  background: rgba(228, 228, 231, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.03);
+  background: #ffffff;
+  color: #171717;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.025);
 }
 
 .glass-panel-hover {
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .glass-panel-hover:hover {
-  background: rgba(209, 213, 219, 0.95);
-  border-color: rgba(0, 0, 0, 0.25);
-  transform: translateY(-4px) scale(1.015);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.03);
+  border-color: #d1d5db;
 }
 
 .glass-input {

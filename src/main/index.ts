@@ -1,10 +1,9 @@
-import { setProjectedApplicationAudio, setNativeSessionAudio, getNativeAudioStatus, installNativeAudio } from './gamestream-host';
-// SpaceViewer v2.2.9
+// SpaceViewer v3.1.0
 // ============================================================
-// ScreenFlow — Main Electron Entry Point
+// SpaceViewer — Main Electron Entry Point
 // ============================================================
 
-// Catch non-fatal network interface / mDNS / SSDP multicast exceptions (e.g. EADDRNOTAVAIL 224.0.0.251:5353)
+// Catch non-fatal network interface / mDNS / UDP broadcast exceptions (e.g. EADDRNOTAVAIL 224.0.0.251:5353)
 process.on('uncaughtException', (err: any) => {
   const msg = err?.message || String(err);
   if (
@@ -27,26 +26,30 @@ process.on('unhandledRejection', (reason: any) => {
   console.warn('[SpaceViewer] Unhandled Promise Rejection in main process:', reason);
 });
 
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron';
 
 // Disable WebRTC mDNS local IP hiding to ensure devices on local network can resolve raw IPs
-app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
+// and disable background throttling / occlusion so capture and encode stay at full speed when window is hidden
+app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns,CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 
 import * as path from 'path';
+import * as fs from 'fs';
 import * as os from 'os';
 import * as http from 'http';
-import * as https from 'https';
 import Store from 'electron-store';
 import { readInstallMode, saveInstallMode } from './installer';
+import { setAutostart } from './autostart';
 import { SignalingServer } from './signaling';
 import { NetworkDiscovery } from './discovery';
 import { setupTray, destroyTray } from './tray';
-import { ensurePrivateNetworkProfile, getCleanMdnsHostname, getPrimaryLANIPv4 } from './network-utils';
+import { createSafeBonjour, ensurePrivateNetworkProfile, getCleanMdnsHostname, getPrimaryLANIPv4 } from './network-utils';
 import { getAvailableScreens, getScreensDetailed, getAppWindows } from './capture';
 import {
   startAppProjector,
   stopAppProjector,
-  startObsProjector,
   stopObsProjector,
   getActiveProjectors,
   moveWindowToScreen,
@@ -55,70 +58,138 @@ import {
   refreshProjectorDisplays,
 } from './projector';
 import {
-  checkHostStatus,
-  refreshHostCapture,
-  getNativeSessions,
-  setNativeSessionDisplay,
-  startHost,
-  stopHost,
-  restartHost,
-  getVirtualDisplayStatus,
-  getVirtualDisplayState,
-  setVirtualDisplayCount,
-  addVirtualDisplay,
-  removeVirtualDisplay,
-  toggleVirtualDisplays,
-  installVirtualDisplayDriver,
+  listPcDisplays,
+  getVirtualDriverState,
+  installVirtualDriver,
   setDisplayMode,
-  getHostDisplays,
-  getHostSettings,
-  setHostSettings,
-  getMoonlightClients,
-  removeMoonlightClient,
-  pairMoonlightPin,
-  startPairingWatcher,
-  stopPairingWatcher,
-  getStreamStats,
-  getSunshineConfig,
-  setSunshineConfig,
-  setMoonlightScreen,
-} from './gamestream-host';
+  setDisplayPosition,
+  setPrimaryDisplay,
+} from './display-topology';
+import { detachAllVirtualOutputs, invalidateDisplayInventory } from './windows-displays';
+import { DisplayReceivers } from './display-receivers';
+import { DisplaySessions } from './display-sessions';
 import { AgentServer } from './agent-server';
-import { TVDiscovery } from './tv-discovery';
 import { checkForAppUpdates, downloadAndInstallUpdate, applyUpdateAndRestart } from './updater';
-import { ensureVirtualDisplayCursorVisible } from './cursor-manager';
-import type { AppSettings, InstallMode, MasterInfo } from '../shared/types';
-import { DEFAULT_SETTINGS, APP_VERSION } from '../shared/constants';
+import { ensureVirtualDisplayCursorVisible, restoreNormalCursor } from './cursor-manager';
+import { raiseAppPriority } from './process-priority';
+import { getDiagnosticsDir } from './diagnostics-log';
+import type { AppSettings, InstallMode, MasterInfo, ReceiverAssignment, ReceiverMode } from '../shared/types';
+import { DEFAULT_SETTINGS, APP_VERSION, APK_FILE_NAME } from '../shared/constants';
 
 let mainWindow: BrowserWindow | null = null;
 let signalingServer: SignalingServer | null = null;
 let discovery: NetworkDiscovery | null = null;
 let agentServer: AgentServer | null = null;
-let tvDiscovery: TVDiscovery | null = null;
+let receivers: DisplayReceivers | null = null;
+let sessions: DisplaySessions | null = null;
 let installMode: InstallMode = 'both';
 let isQuitting = false;
-let moonlightStatsTimer: NodeJS.Timeout | null = null;
+/** Why the signaling server is not listening (shown when a receiver cannot connect). */
+let signalingError: string | null = null;
 
-const store = new Store<AppSettings>({
+const store = new Store<AppSettings & { migrations?: Record<string, boolean> }>({
   name: 'settings',
   defaults: DEFAULT_SETTINGS,
 });
 
+// One-time migration: switch previous default ('native') to 'webrtc' while preserving future user choices.
+if (!store.get('migrations.webrtcDefaultV321')) {
+  const savedDisplay = store.get('display') as Partial<AppSettings['display']> | undefined;
+  if (savedDisplay && savedDisplay.transport === 'native') {
+    store.set('display.transport', 'webrtc');
+  }
+  store.set('migrations.webrtcDefaultV321', true);
+}
+
+/** Settings with defaults for sections added in newer versions (e.g. `display`). */
+function currentSettings(): AppSettings {
+  const raw = (store.store || {}) as Partial<AppSettings> & { migrations?: Record<string, boolean> };
+  const { migrations: _migrations, ...saved } = raw;
+  return {
+    ...DEFAULT_SETTINGS,
+    ...saved,
+    display: {
+      ...DEFAULT_SETTINGS.display,
+      transport: saved.display?.transport ?? DEFAULT_SETTINGS.display.transport,
+      totalBitrateKbps: saved.display?.totalBitrateKbps ?? DEFAULT_SETTINGS.display.totalBitrateKbps,
+      ...(saved.display || {}),
+      quality: { ...DEFAULT_SETTINGS.display.quality, ...(saved.display?.quality || {}) },
+      audio: { ...DEFAULT_SETTINGS.display.audio, ...(saved.display?.audio || {}) },
+    },
+  } as AppSettings;
+}
+
+function send(channel: string, payload?: unknown) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+}
+
+function apkPath(): string | null {
+  const candidates = [
+    ...(app.isPackaged ? [path.join(process.resourcesPath, 'apk', APK_FILE_NAME)] : []),
+    path.join(app.getAppPath(), 'resources', 'apk', APK_FILE_NAME),
+    path.join(process.cwd(), 'resources', 'apk', APK_FILE_NAME),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
+}
+
+const masterEnabled = () => installMode === 'master' || installMode === 'both';
+
+function createSignalingServer(port: number) {
+  const server = new SignalingServer(port, {
+    isExpectedDisplay: (sessionId, deviceId) => sessions?.isExpectedSession(sessionId, deviceId) ?? false,
+    apkPath,
+  });
+  server.on('agent-connected', (agent) => send('agent-connected', agent));
+  server.on('agent-disconnected', (id) => send('agent-disconnected', id));
+  server.on('agent-updated', (agent) => send('agent-connected', agent));
+  server.on('signaling-message', (msg) => send('signaling-message', msg));
+  server.on('display-connected', (event) => sessions?.onDisplayConnected(event));
+  server.on('display-message', (event) => sessions?.onDisplayMessage(event));
+  server.on('display-disconnected', (event) => sessions?.onDisplayDisconnected(event));
+  server.on('error', (error: Error) => console.error('[SpaceViewer] Signaling server error:', error.message));
+  return server;
+}
+
+function ensureReceivers() {
+  if (receivers) return;
+  receivers = new DisplayReceivers(undefined, () => createSafeBonjour({ reuseAddr: true }));
+  sessions = new DisplaySessions({ settings: currentSettings, signaling: () => signalingServer, signalingError: () => signalingError, receivers });
+  sessions.on('updated', (list) => send('display-receivers-updated', list));
+  sessions.on('session-ready', (ready) => {
+    raiseAppPriority();
+    send('display-session-ready', ready);
+  });
+  sessions.on('session-ended', (info) => send('display-session-ended', info));
+  sessions.on('signal', (msg) => send('signaling-message', msg));
+  sessions.on('notice', (message: string) => send('connection-error', message));
+  sessions.on('native-audio-state', (payload) => send('native-audio-state', payload));
+  receivers.start();
+  detachAllVirtualOutputs().catch(() => {});
+}
+
 async function applySettings(settings: AppSettings) {
-  console.log('[ScreenFlow] Applying settings:', settings);
+  console.log('[SpaceViewer] Applying settings');
 
   try {
-    // 1. Signaling Server
-    if (installMode === 'master' || installMode === 'both') {
-      if (!signalingServer) {
-        signalingServer = new SignalingServer(settings.server.port);
-        setupSignalingListeners();
-        await signalingServer.start();
-      } else if (settings.server.port !== (signalingServer as any).port) {
-        await signalingServer.stop();
-        signalingServer = new SignalingServer(settings.server.port);
-        setupSignalingListeners();
-        await signalingServer.start();
+    await setAutostart(settings.startup.launchWithWindows);
+    // 1. Signaling Server (WebRTC signaling for PC agents and Android receivers)
+    if (masterEnabled()) {
+      // Discovery works without the signaling port, so the device list is available even if the port is taken.
+      ensureReceivers();
+      if (!signalingServer || !signalingServer.isRunning || settings.server.port !== signalingServer.listeningPort) {
+        if (signalingServer) await signalingServer.stop().catch(() => {});
+        signalingServer = createSignalingServer(settings.server.port);
+        try {
+          await signalingServer.start();
+          signalingError = null;
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code;
+          signalingError = code === 'EADDRINUSE'
+            ? `A porta ${settings.server.port} já está em uso (outra cópia do SpaceViewer aberta?). Feche-a ou troque a porta em Opções → Servidor.`
+            : `Não foi possível abrir a porta ${settings.server.port}: ${(error as Error).message}`;
+          console.error('[SpaceViewer]', signalingError);
+          send('connection-error', signalingError);
+        }
       }
     } else {
       if (signalingServer) {
@@ -131,97 +202,46 @@ async function applySettings(settings: AppSettings) {
     if (installMode === 'agent' || installMode === 'both') {
       if (!agentServer) {
         agentServer = new AgentServer();
-        setupAgentServerListeners();
+        agentServer.on('connect-request', (masterData) => send('force-connect-to-master', masterData));
         await agentServer.start();
       }
-    } else {
-      if (agentServer) {
-        await agentServer.stop();
-        agentServer = null;
-      }
+    } else if (agentServer) {
+      await agentServer.stop();
+      agentServer = null;
     }
 
-    // 2. mDNS Discovery
+    // 2. mDNS Discovery (PC master/agent)
     if (settings.server.enableMdns) {
-      if (!discovery) {
-        discovery = new NetworkDiscovery();
-      }
+      if (!discovery) discovery = new NetworkDiscovery();
       discovery.destroy(); // Reset
 
-      if (installMode === 'master' || installMode === 'both') {
+      if (masterEnabled()) {
         const name = settings.server.networkInterface && settings.server.networkInterface !== 'auto'
           ? settings.server.networkInterface
           : app.getName();
         discovery.publishMaster(name, settings.server.port);
       }
 
-      if (installMode === 'agent' || installMode === 'both') {
-        if (agentServer && agentServer.isRunning) {
-          const name = settings.server.networkInterface && settings.server.networkInterface !== 'auto'
-            ? settings.server.networkInterface
-            : os.hostname();
-          discovery.publishAgent(name, (agentServer as any).port);
-        }
+      if ((installMode === 'agent' || installMode === 'both') && agentServer?.isRunning) {
+        const name = settings.server.networkInterface && settings.server.networkInterface !== 'auto'
+          ? settings.server.networkInterface
+          : os.hostname();
+        discovery.publishAgent(name, (agentServer as any).port);
       }
-    } else {
-      if (discovery) {
-        discovery.destroy();
-        discovery = null;
-      }
+    } else if (discovery) {
+      discovery.destroy();
+      discovery = null;
     }
   } catch (err) {
-    console.error('[ScreenFlow] Error applying settings:', err);
+    console.error('[SpaceViewer] Error applying settings:', err);
   }
-}
-
-function setupSignalingListeners() {
-  if (!signalingServer) return;
-
-  signalingServer.on('agent-connected', (agent) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('agent-connected', agent);
-    }
-  });
-
-  signalingServer.on('agent-disconnected', (id) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('agent-disconnected', id);
-    }
-  });
-
-  signalingServer.on('agent-updated', (agent) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('agent-connected', agent);
-    }
-  });
-
-  signalingServer.on('signaling-message', (msg) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('signaling-message', msg);
-    }
-  });
-}
-
-function setupAgentServerListeners() {
-  if (!agentServer) return;
-
-  agentServer.on('connect-request', (masterData) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      console.log('[Main] Forwarding force-connect-to-master to renderer:', masterData);
-      mainWindow.webContents.send('force-connect-to-master', masterData);
-    }
-  });
 }
 
 function getLocalIpAddress(): string {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
-    const iface = interfaces[name];
-    if (!iface) continue;
-    for (const info of iface) {
-      if (info.family === 'IPv4' && !info.internal) {
-        return info.address;
-      }
+    for (const info of interfaces[name] || []) {
+      if (info.family === 'IPv4' && !info.internal) return info.address;
     }
   }
   return '127.0.0.1';
@@ -231,26 +251,26 @@ async function createWindow() {
   // Check and ensure network profile allows local discovery
   ensurePrivateNetworkProfile();
 
-  // Read install mode
   installMode = await readInstallMode();
-  const settings = store.store || DEFAULT_SETTINGS;
+  const settings = currentSettings();
 
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
-    minHeight: 650,
+    width: 1280,
+    height: 820,
+    minWidth: 960,
+    minHeight: 660,
     frame: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true,
       webSecurity: false,
+      // Keep capture/encoding at full rate while the window is minimized or hidden in the tray.
+      backgroundThrottling: false,
     },
     backgroundColor: '#0A0F1E',
   });
 
-  // Load URL or File
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
@@ -258,7 +278,7 @@ async function createWindow() {
   }
 
   mainWindow.on('close', (event) => {
-    if (!isQuitting) {
+    if (!isQuitting && store.get('startup.minimizeToTray')) {
       event.preventDefault();
       mainWindow?.hide();
     }
@@ -283,24 +303,25 @@ async function createWindow() {
   });
 
   // Auto-recover if renderer process crashes or hangs
-  mainWindow.webContents.on('render-process-gone', (event, details) => {
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
     console.warn('[Main] Render process gone:', details);
-    if (!mainWindow?.isDestroyed()) {
-      mainWindow?.reload();
-    }
+    if (!mainWindow?.isDestroyed()) mainWindow?.reload();
   });
 
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+  // A reload drops every renderer peer: restart the receiver streams once it is back.
+  mainWindow.webContents.on('did-finish-load', () => {
+    sessions?.onRendererReloaded();
+    send('native-audio-state', { enabled: sessions?.hasNativeAudio() ?? false });
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
     console.error('[Main] Window load failed:', errorCode, errorDescription);
   });
 
-  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    if (level >= 2) {
-      console.warn(`[Renderer Console] ${message} (${sourceId}:${line})`);
-    }
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level >= 2) console.warn(`[Renderer Console] ${message} (${sourceId}:${line})`);
   });
 
-  // Setup Tray
   setupTray(installMode, mainWindow, {
     onPauseStream: () => {
       if (signalingServer) signalingServer.pauseAll();
@@ -314,215 +335,71 @@ async function createWindow() {
     },
   });
 
-  // Initialize GameStream (Native SpaceviwerStream Host) automatically on startup
-  if (installMode === 'master' || installMode === 'both' || !installMode) {
-    startHost().then((success) => {
-      console.log(`[Main] Native GameStream host auto-start result: ${success ? 'RUNNING' : 'FAILED'}`);
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('gamestream-status-changed', success ? 'running' : 'stopped');
-      }
-    }).catch(console.error);
-
-    // Start polling GameStream host for real-time stream stats every 2 seconds
-    startMoonlightStatsPolling();
-
-    // Start Smart TV Discovery engine
-    if (!tvDiscovery) {
-      tvDiscovery = new TVDiscovery();
-      tvDiscovery.on('devices-updated', (tvs) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('smart-tvs-updated', tvs);
-        }
-      });
-      tvDiscovery.start();
-    }
-
-    // Start watching for incoming Moonlight pairing requests from Smart TVs
-    startPairingWatcher((info) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        console.log('[Main] Bringing SpaceViewer to foreground for incoming pairing request');
-        if (mainWindow.isMinimized()) mainWindow.restore();
-        mainWindow.show();
-        mainWindow.focus();
-        mainWindow.webContents.send('moonlight-pairing-requested', info);
-      }
-    });
-  }
-
-  // Apply running settings
   await applySettings(settings);
 
-  // Auto-start TV & Moonlight discovery in Master mode
-  if (installMode === 'master' || installMode === 'both') {
-    if (!tvDiscovery) {
-      tvDiscovery = new TVDiscovery();
-      tvDiscovery.on('devices-updated', (tvs) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('smart-tvs-updated', tvs);
-        }
-      });
-      tvDiscovery.start();
-    }
-  }
-
   // Listen for screen/monitor topology changes (plug/unplug/virtual display switch)
-  const notifyScreensChanged = () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('screens-changed');
-    }
-  };
   let displayChangeTimer: NodeJS.Timeout | undefined;
   const onDisplayChange = () => {
     if (displayChangeTimer) clearTimeout(displayChangeTimer);
     displayChangeTimer = setTimeout(() => {
+      invalidateDisplayInventory();
       refreshProjectorDisplays();
-      refreshHostCapture().catch(console.error);
       for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('screens-changed');
     }, 500);
   };
   screen.on('display-added', onDisplayChange);
   screen.on('display-removed', onDisplayChange);
   screen.on('display-metrics-changed', onDisplayChange);
-  setProjectorChangeListener(notifyScreensChanged);
+  setProjectorChangeListener(() => send('screens-changed'));
+
+  raiseAppPriority();
 }
 
-function startMoonlightStatsPolling() {
-  if (moonlightStatsTimer) clearInterval(moonlightStatsTimer);
-  moonlightStatsTimer = setInterval(async () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    try {
-      const stats = await getStreamStats();
-      mainWindow.webContents.send('moonlight-stream-stats', stats);
-    } catch {
-      // ignore polling errors
-    }
-  }, 2000);
-}
-
-function stopMoonlightStatsPolling() {
-  if (moonlightStatsTimer) {
-    clearInterval(moonlightStatsTimer);
-    moonlightStatsTimer = null;
-  }
-}
-
-function cleanup() {
+async function cleanup() {
   destroyTray();
-  stopMoonlightStatsPolling();
-  stopPairingWatcher();
-  if (signalingServer) {
-    signalingServer.stop();
-  }
-  if (discovery) {
-    discovery.destroy();
-  }
-  if (tvDiscovery) {
-    tvDiscovery.stop();
-    tvDiscovery = null;
-  }
-  if (agentServer) {
-    agentServer.stop().catch(console.error);
-  }
+  await sessions?.shutdown().catch(() => {});
+  receivers?.stop();
+  if (signalingServer) signalingServer.stop();
+  if (discovery) discovery.destroy();
+  if (agentServer) agentServer.stop().catch(console.error);
   stopObsProjector().catch(console.error);
-  stopHost().catch(console.error);
 }
 
 // === IPC HANDLERS ===
 function registerIpcHandlers() {
   // Screens & Application Projector
-  ipcMain.handle('get-screens-detailed', async () => {
-    return await getScreensDetailed();
-  });
-
-  ipcMain.handle('get-app-windows', async () => {
-    return await getAppWindows();
-  });
-
-  ipcMain.handle('start-app-projector', async (_, sourceId: string, appName: string, displayId: string) => {
-    const result = await startAppProjector(sourceId, appName, displayId);
-    if (result.success) await setProjectedApplicationAudio(sourceId, displayId);
-    return result;
-  });
-
-  ipcMain.handle('start-obs-projector', async (_, sourceId: string, appName: string, displayId: string) => {
-    const result = await startAppProjector(sourceId, appName, displayId);
-    if (result.success) await setProjectedApplicationAudio(sourceId, displayId);
-    return result;
-  });
-
-  ipcMain.handle('stop-app-projector', async (_, displayId?: string) => {
-    return await stopAppProjector(displayId);
-  });
-
-  ipcMain.handle('stop-obs-projector', async (_, displayId?: string) => {
-    return await stopAppProjector(displayId);
-  });
-
-  ipcMain.handle('get-projector-params', (event) => {
-    return getProjectorParamsForWindow(event.sender.id);
-  });
-
-  ipcMain.handle('get-active-projectors', async () => {
-    return getActiveProjectors();
-  });
-
-  ipcMain.handle('move-window-to-screen', async (_, windowName: string, displayId: string, sourceId?: string) => {
-    const result = await moveWindowToScreen(windowName, displayId, sourceId);
-    if (result.success && sourceId) await setProjectedApplicationAudio(sourceId, displayId);
-    return result;
-  });
+  ipcMain.handle('get-screens-detailed', async () => getScreensDetailed());
+  ipcMain.handle('get-app-windows', async () => getAppWindows());
+  ipcMain.handle('start-app-projector', async (_, sourceId: string, appName: string, displayId: string) => startAppProjector(sourceId, appName, displayId));
+  ipcMain.handle('stop-app-projector', async (_, displayId?: string) => stopAppProjector(displayId));
+  ipcMain.handle('get-projector-params', (event) => getProjectorParamsForWindow(event.sender.id));
+  ipcMain.handle('get-active-projectors', async () => getActiveProjectors());
+  ipcMain.handle('move-window-to-screen', async (_, windowName: string, displayId: string, sourceId?: string) => moveWindowToScreen(windowName, displayId, sourceId));
 
   // Master
-  ipcMain.handle('get-screens', async () => {
-    return await getAvailableScreens();
-  });
+  ipcMain.handle('get-screens', async () => getAvailableScreens());
 
-  // Master: scan for agents
+  // Master: scan for PC agents
   ipcMain.handle('discover-agents', async () => {
-    console.log('[Main] Master started agent discovery');
-    if (!discovery) {
-      discovery = new NetworkDiscovery();
-    }
-    discovery.discoverAgents((agent) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('agent-discovered', agent);
-      }
-    });
+    if (!discovery) discovery = new NetworkDiscovery();
+    discovery.discoverAgents((agent) => send('agent-discovered', agent));
     return [];
   });
 
-  // Master: invite an agent manually
+  // Master: invite a PC agent manually
   ipcMain.handle('invite-agent', async (_, ip: string, port: number) => {
-    console.log(`[Main] Inviting agent at ${ip}:${port}`);
-    const settings = store.store || DEFAULT_SETTINGS;
-    const masterPort = settings.server.port;
+    const settings = currentSettings();
     const masterName = settings.server.networkInterface && settings.server.networkInterface !== 'auto'
       ? settings.server.networkInterface
       : os.hostname();
-
-    const localIp = getLocalIpAddress();
-
+    const url = `http://${ip}:${port}/connect-to-master?host=${getLocalIpAddress()}&port=${settings.server.port}&name=${encodeURIComponent(masterName)}`;
     return new Promise((resolve) => {
-      const url = `http://${ip}:${port}/connect-to-master?host=${localIp}&port=${masterPort}&name=${encodeURIComponent(masterName)}`;
-      console.log(`[Main] Sending invite request to: ${url}`);
-      
       const req = http.get(url, (res) => {
         let data = '';
         res.on('data', (chunk) => { data += chunk; });
-        res.on('end', () => {
-          if (res.statusCode === 200) {
-            resolve({ success: true });
-          } else {
-            resolve({ success: false, error: `Server responded with status ${res.statusCode}: ${data}` });
-          }
-        });
+        res.on('end', () => resolve(res.statusCode === 200 ? { success: true } : { success: false, error: `Server responded with status ${res.statusCode}: ${data}` }));
       });
-
-      req.on('error', (err) => {
-        console.error('[Main] Failed to invite agent:', err);
-        resolve({ success: false, error: err.message });
-      });
-
+      req.on('error', (err) => resolve({ success: false, error: err.message }));
       req.setTimeout(5000, () => {
         req.destroy();
         resolve({ success: false, error: 'Invitation request timed out' });
@@ -530,361 +407,178 @@ function registerIpcHandlers() {
     });
   });
 
-  // Moonlight / GameStream (Native SpaceviwerStream Host)
-  ipcMain.handle('check-sunshine', async () => {
-    return await checkHostStatus();
-  });
-
-  ipcMain.handle('start-gamestream', async () => {
-    console.log('[Main] Start GameStream (SpaceviwerStream)');
-    const success = await startHost();
-    if (success && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('gamestream-status-changed', 'running');
-    }
-    return success;
-  });
-
-  ipcMain.handle('stop-gamestream', async () => {
-    console.log('[Main] Stop GameStream (SpaceviwerStream)');
-    await stopHost();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('gamestream-status-changed', 'stopped');
-    }
-  });
-
-  ipcMain.handle('get-gamestream-status', async () => {
-    const status = await checkHostStatus();
-    return status === 'running' ? 'running' : 'stopped';
-  });
-
+  // PC displays
+  ipcMain.handle('list-pc-displays', () => listPcDisplays(sessions?.displayAssignments() ?? {}));
+  ipcMain.handle('get-virtual-driver-state', () => getVirtualDriverState());
+  ipcMain.handle('install-virtual-driver', () => installVirtualDriver());
+  ipcMain.handle('set-display-resolution', (_, deviceName: string, width: number, height: number, refreshRate: number) => setDisplayMode(deviceName, width, height, refreshRate));
+  ipcMain.handle('set-display-position', (_, deviceName: string, x: number, y: number) => setDisplayPosition(deviceName, x, y));
+  ipcMain.handle('set-primary-display', (_, deviceName: string) => setPrimaryDisplay(deviceName));
+  ipcMain.handle('ensure-virtual-cursor', () => ensureVirtualDisplayCursorVisible());
+  ipcMain.handle('restore-normal-cursor', () => restoreNormalCursor());
   ipcMain.handle('get-host-info', () => {
+    const ip = getPrimaryLANIPv4();
+    const port = signalingServer?.listeningPort ?? currentSettings().server.port;
     return {
       hostname: getCleanMdnsHostname(),
       rawHostname: os.hostname(),
-      ip: getPrimaryLANIPv4(),
+      ip,
+      apkUrl: apkPath() && ip ? `http://${ip}:${port}/apk` : null,
     };
   });
 
-  // Extended Virtual Display & Native Controls
-  ipcMain.handle('get-virtual-display-status', async () => {
-    return await getVirtualDisplayStatus();
+  // Android receivers
+  const needSessions = () => {
+    if (!sessions) throw new Error('As telas sem fio só funcionam no modo Transmissor.');
+    return sessions;
+  };
+  ipcMain.handle('list-receivers', () => sessions?.list() ?? []);
+  ipcMain.handle('scan-receivers', async () => {
+    if (!receivers) return [];
+    await receivers.scan();
+    return sessions?.list() ?? [];
   });
-
-  ipcMain.handle('get-virtual-display-state', async () => {
-    return await getVirtualDisplayState();
-  });
-
-  ipcMain.handle('set-virtual-display-count', async (_, count: number) => {
-    return await setVirtualDisplayCount(count);
-  });
-
-  ipcMain.handle('add-virtual-display', async () => {
-    return await addVirtualDisplay();
-  });
-
-  ipcMain.handle('remove-virtual-display', async () => {
-    return await removeVirtualDisplay();
-  });
-
-  ipcMain.handle('toggle-virtual-displays', async (_, enabled: boolean) => {
-    return await toggleVirtualDisplays(enabled);
-  });
-
-  ipcMain.handle('install-virtual-display-driver', async () => {
-    return await installVirtualDisplayDriver();
-  });
-
-  ipcMain.handle('set-display-mode', async (_, mode) => {
-    return await setDisplayMode(mode);
-  });
-
-  ipcMain.handle('get-host-displays', async () => {
-    return await getHostDisplays();
-  });
-
-  ipcMain.handle('set-native-session-audio', (_, address: string, sourceId: string) => setNativeSessionAudio(address, sourceId));
-  ipcMain.handle('get-native-audio-status', () => getNativeAudioStatus());
-  ipcMain.handle('install-native-audio', () => installNativeAudio());
-  ipcMain.handle('get-native-sessions', () => getNativeSessions());
-  ipcMain.handle('set-native-session-display', (_, address: string, display: number) => setNativeSessionDisplay(address, display));
-  ipcMain.handle('get-host-settings', async () => {
-    return await getHostSettings();
-  });
-
-  ipcMain.handle('set-host-settings', async (_, settings) => {
-    return await setHostSettings(settings);
-  });
-
-  ipcMain.handle('refresh-host-capture', async () => {
-    return await refreshHostCapture();
-  });
-
-  ipcMain.handle('ensure-virtual-cursor', async () => {
-    return await ensureVirtualDisplayCursorVisible();
-  });
-
-  // Moonlight — Screen Selection
-  ipcMain.handle('get-moonlight-screens', async () => {
-    return await getAvailableScreens();
-  });
-
-  ipcMain.handle('set-moonlight-screen', async (_, sourceId: string) => {
-    console.log('[Main] Set Moonlight screen source:', sourceId);
-    const allScreens = await getAvailableScreens();
-    return await setMoonlightScreen(sourceId, allScreens);
-  });
-
-  // Moonlight — Clients
-  ipcMain.handle('get-moonlight-clients', async () => {
-    return await getMoonlightClients();
-  });
-
-  ipcMain.handle('remove-moonlight-client', async (_, uuid: string) => {
-    return await removeMoonlightClient(uuid);
-  });
-
-  // Moonlight / Smart TVs — Discovery
-  ipcMain.handle('discover-smart-tvs', async () => {
-    if (!tvDiscovery) {
-      tvDiscovery = new TVDiscovery();
-      tvDiscovery.on('devices-updated', (tvs) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('smart-tvs-updated', tvs);
-        }
-      });
-      tvDiscovery.start();
+  ipcMain.handle('add-receiver-by-ip', async (_, ip: string) => {
+    try {
+      if (!receivers) throw new Error('As telas sem fio só funcionam no modo Transmissor.');
+      await receivers.addManual(ip);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
     }
-    tvDiscovery.triggerScan();
-    return await tvDiscovery.getDiscoveredTVs();
+  });
+  ipcMain.handle('set-receiver-assignment', (_, id: string, assignment: Partial<ReceiverAssignment>) => needSessions().setAssignment(id, assignment));
+  ipcMain.handle('connect-receiver', (_, id: string) => needSessions().connect(id));
+  ipcMain.handle('disconnect-receiver', (_, id: string) => needSessions().disconnect(id));
+  ipcMain.handle('apply-receivers-mode', (_, ids: string[], mode: ReceiverMode, sourceDisplayId?: string) => needSessions().applyMode(ids, mode, sourceDisplayId));
+  ipcMain.handle('disconnect-all-receivers', () => needSessions().disconnectAll());
+  ipcMain.on('report-receiver-status', (_, receiverId: string, status: 'streaming' | 'error', error?: string) => sessions?.reportStatus(receiverId, status, error));
+  ipcMain.on('report-receiver-notice', (_, receiverId: string, message: string) => sessions?.reportNotice(receiverId, message));
+
+  // Native audio from renderer
+  ipcMain.on('native-audio-chunk', (_, chunk) => {
+    if (!sessions) return;
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    sessions.onNativeAudio(buf);
   });
 
-  // Moonlight — Stream Stats
-  ipcMain.handle('get-sunshine-stream-stats', async () => {
-    return await getStreamStats();
-  });
-
-  // Moonlight — Configuration
-  ipcMain.handle('get-sunshine-config', async () => {
-    return await getSunshineConfig();
-  });
-
-  ipcMain.handle('set-sunshine-config', async (_, config: any) => {
-    return await setSunshineConfig(config);
-  });
-
-  ipcMain.handle('pair-moonlight-pin', async (_, pin: string) => {
-    console.log(`[Main] Attempting to pair Moonlight PIN: ${pin}`);
-    const result = await pairMoonlightPin(pin);
-    // After pairing, trigger a TV scan refresh so the TV status turns to Paired immediately
-    if (result.success && tvDiscovery) {
-      setTimeout(() => tvDiscovery?.triggerScan(), 1000);
-    }
-    return result;
-  });
-
+  // PC agent streaming (WebRTC to SpaceViewer desktop receivers)
   ipcMain.handle('start-capture', async (_, config) => {
-    console.log('[Main] Start Capture:', config);
-    if (signalingServer) {
-      signalingServer.broadcast({
-        type: 'stream-start',
-        payload: config,
-      });
-    }
+    signalingServer?.broadcast({ type: 'stream-start', payload: config });
     return true;
   });
-
   ipcMain.handle('stop-capture', async () => {
-    console.log('[Main] Stop Capture');
-    if (signalingServer) {
-      signalingServer.broadcast({
-        type: 'stream-stop',
-        payload: { reason: 'stopped' },
-      });
-    }
+    signalingServer?.broadcast({ type: 'stream-stop', payload: { reason: 'stopped' } });
   });
-
   ipcMain.handle('pause-capture', async () => {
-    console.log('[Main] Pause Capture');
-    if (signalingServer) {
-      signalingServer.broadcast({
-        type: 'stream-stop',
-        payload: { reason: 'paused' },
-      });
-    }
+    signalingServer?.broadcast({ type: 'stream-stop', payload: { reason: 'paused' } });
   });
 
-  ipcMain.handle('get-network-addresses', async () => {
-    if (signalingServer) {
-      return signalingServer.getLocalAddresses();
-    }
-    // Fallback if signaling server not initialized
-    const s = new SignalingServer();
-    return s.getLocalAddresses();
-  });
-
-  ipcMain.handle('get-server-status', async () => {
-    if (signalingServer && signalingServer.isRunning) {
-      return 'running';
-    }
-    return 'stopped';
-  });
-
-  ipcMain.handle('get-connected-agents', async () => {
-    if (signalingServer) {
-      return signalingServer.getAgentsList();
-    }
-    return [];
-  });
-
-  ipcMain.handle('disconnect-agent', async (_, id) => {
-    if (signalingServer) {
-      signalingServer.disconnectAgentById(id);
-    }
-  });
-
-  ipcMain.handle('accept-agent', async (_, id) => {
-    if (signalingServer) {
-      signalingServer.acceptAgent(id);
-    }
-  });
-
+  ipcMain.handle('get-network-addresses', async () => (signalingServer ?? new SignalingServer()).getLocalAddresses());
+  ipcMain.handle('get-server-status', async () => (signalingServer?.isRunning ? 'running' : 'stopped'));
+  ipcMain.handle('get-connected-agents', async () => signalingServer?.getAgentsList() ?? []);
+  ipcMain.handle('disconnect-agent', async (_, id) => { signalingServer?.disconnectAgentById(id); });
+  ipcMain.handle('accept-agent', async (_, id) => { signalingServer?.acceptAgent(id); });
   ipcMain.handle('send-message', async (_, id, msg) => {
-    if (signalingServer) {
-      try {
-        const parsed = JSON.parse(msg);
-        signalingServer.sendToAgent(id, parsed);
-      } catch {
-        signalingServer.sendToAgent(id, { type: 'signaling-message', payload: msg });
-      }
+    if (!signalingServer) return;
+    try {
+      signalingServer.sendToAgent(id, JSON.parse(msg));
+    } catch {
+      signalingServer.sendToAgent(id, { type: 'signaling-message', payload: msg });
     }
   });
 
   // Agent Discovery
   ipcMain.handle('discover-masters', async () => {
-    console.log('[Main] Agent started discovery');
-    if (!discovery) {
-      discovery = new NetworkDiscovery();
-    }
-    // Start browsing and forward to renderer
-    discovery.discoverMasters((master) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('master-discovered', master);
-      }
-    });
+    if (!discovery) discovery = new NetworkDiscovery();
+    discovery.discoverMasters((master) => send('master-discovered', master));
     return [];
   });
 
-  let currentMasterInfo: MasterInfo | null = null;
   ipcMain.handle('connect-to-master', async (_, info: MasterInfo) => {
     console.log('[Main] Connect to master:', info);
-    currentMasterInfo = info;
     return true;
   });
 
   ipcMain.handle('disconnect-from-master', async () => {
     console.log('[Main] Disconnect from master');
-    currentMasterInfo = null;
   });
 
   // Shared
-  ipcMain.handle('get-install-mode', async () => {
-    return installMode;
-  });
+  ipcMain.handle('get-install-mode', async () => installMode);
 
   ipcMain.handle('set-install-mode', async (_, mode: InstallMode) => {
     installMode = mode;
     await saveInstallMode(mode);
-    console.log('[Main] Install mode set to:', mode);
-    // Restart signaling / discovery services based on new mode
-    const settings = store.store || DEFAULT_SETTINGS;
-    await applySettings(settings);
+    await applySettings(currentSettings());
   });
 
   ipcMain.handle('save-settings', async (_, settings: AppSettings) => {
-    store.store = settings;
-    await applySettings(settings);
-  });
-
-  ipcMain.handle('get-settings', async () => {
-    return store.store || DEFAULT_SETTINGS;
-  });
-
-  ipcMain.handle('get-app-version', async () => {
-    return APP_VERSION;
-  });
-
-  // Auto-Update
-  ipcMain.handle('updater:check', async () => {
-    return await checkForAppUpdates();
-  });
-
-  ipcMain.handle('updater:download-and-install', async (_, downloadUrl: string) => {
-    return await downloadAndInstallUpdate(downloadUrl, (progress) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('updater:progress', progress);
-      }
-    });
-  });
-
-  ipcMain.handle('updater:apply-and-restart', async () => {
-    return await applyUpdateAndRestart();
-  });
-
-  // Window actions
-  ipcMain.on('window-minimize', () => {
-    if (mainWindow) mainWindow.minimize();
-  });
-
-  ipcMain.on('window-maximize', () => {
-    if (mainWindow) {
-      if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
-      } else {
-        mainWindow.maximize();
-      }
+    const previousTransport = currentSettings().display.transport;
+    const previousQuality = JSON.stringify(currentSettings().display.quality);
+    const previousAudio = JSON.stringify(currentSettings().display.audio);
+    const previousTotalBitrate = currentSettings().display.totalBitrateKbps;
+    const existingMigrations = store.get('migrations');
+    store.store = existingMigrations ? ({ ...settings, migrations: existingMigrations } as any) : settings;
+    await applySettings(currentSettings());
+    if (
+      currentSettings().display.transport !== previousTransport ||
+      JSON.stringify(currentSettings().display.quality) !== previousQuality ||
+      JSON.stringify(currentSettings().display.audio) !== previousAudio ||
+      currentSettings().display.totalBitrateKbps !== previousTotalBitrate
+    ) {
+      sessions?.onGlobalQualityChanged();
     }
   });
 
-  ipcMain.on('window-close', () => {
-    if (mainWindow) mainWindow.close();
+  ipcMain.handle('get-settings', async () => currentSettings());
+  ipcMain.handle('get-app-version', async () => APP_VERSION);
+  ipcMain.handle('open-diagnostics-folder', async () => {
+    const dir = getDiagnosticsDir();
+    await shell.openPath(dir);
+    return { success: true };
   });
 
-  ipcMain.on('toggle-fullscreen', (_, state: boolean) => {
-    if (mainWindow) mainWindow.setFullScreen(state);
+  // Auto-Update
+  ipcMain.handle('updater:check', async () => checkForAppUpdates());
+  ipcMain.handle('updater:download-and-install', async (_, downloadUrl: string) =>
+    downloadAndInstallUpdate(downloadUrl, (progress) => send('updater:progress', progress)));
+  ipcMain.handle('updater:apply-and-restart', async () => applyUpdateAndRestart());
+
+  // Window actions
+  ipcMain.on('window-minimize', () => mainWindow?.minimize());
+  ipcMain.on('window-maximize', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+    else mainWindow.maximize();
   });
+  ipcMain.on('window-close', () => mainWindow?.close());
+  ipcMain.on('toggle-fullscreen', (_, state: boolean) => mainWindow?.setFullScreen(state));
 }
 
 function startAutomaticUpdateChecker() {
   const check = () => {
     checkForAppUpdates()
       .then((info) => {
-        if (info && info.updateAvailable && mainWindow && !mainWindow.isDestroyed()) {
-          console.log('[Updater] Automatic update check: New version available!', info.latestVersion);
-          mainWindow.webContents.send('updater:available-auto', info);
-        }
+        if (info && info.updateAvailable) send('updater:available-auto', info);
       })
-      .catch((err) => {
-        console.error('[Updater] Background check error:', err);
-      });
+      .catch((err) => console.error('[Updater] Background check error:', err));
   };
-
-  // Initial check 5s after launch
   setTimeout(check, 5000);
-  // Check every 4 hours
   setInterval(check, 4 * 60 * 60 * 1000);
 }
 
 // App lifecycle
-let audioRestoredForQuit = false;
+let cleanedForQuit = false;
 app.on('before-quit', (event) => {
   isQuitting = true;
-  if (!audioRestoredForQuit) {
+  if (!cleanedForQuit) {
     event.preventDefault();
-    stopHost().catch(console.error).finally(() => { audioRestoredForQuit = true; app.quit(); });
+    // Disconnect receivers and remove virtual displays before exiting.
+    cleanup().catch(console.error).finally(() => { cleanedForQuit = true; app.quit(); });
   }
 });
 
-// Prevent multiple instances — second instance focuses existing window
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
@@ -901,22 +595,15 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
     registerIpcHandlers();
     await createWindow();
-    ensureVirtualDisplayCursorVisible().catch(() => {});
-
-    // Automatic background update check on startup & periodically
+    restoreNormalCursor().catch(() => {});
     startAutomaticUpdateChecker();
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-      }
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
   });
 
   app.on('window-all-closed', () => {
-    cleanup();
-    if (process.platform !== 'darwin') {
-      app.quit();
-    }
+    if (process.platform !== 'darwin') app.quit();
   });
 }

@@ -6,9 +6,7 @@ import { BottomNav, SidebarTab } from '../components/ui/BottomNav';
 import { ScreensPanel } from './ScreensPanel';
 import { Dashboard } from './Dashboard';
 import { AgentsList } from './AgentsList';
-import { NetworkMonitor } from './NetworkMonitor';
 import { Settings } from './Settings';
-import { MoonlightPanel } from './MoonlightPanel';
 import { StreamPeer } from '../../shared/webrtc/peer';
 import { STATS_INTERVAL } from '../../shared/constants';
 import type { SignalingMessage } from '../../shared/types';
@@ -41,8 +39,9 @@ export const MasterApp: React.FC<MasterAppProps> = ({ onResetMode, canResetMode 
   } = useMasterStore();
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('screens');
-  const [moonlightClientsCount, setMoonlightClientsCount] = useState(0);
+  const [panelView, setPanelView] = useState<'overview' | 'agents'>('overview');
   const [screensCount, setScreensCount] = useState(1);
+
 
   const peersRef = useRef<Map<string, StreamPeer>>(new Map());
   const activeStreamsRef = useRef<Map<string, MediaStream>>(new Map());
@@ -124,18 +123,6 @@ export const MasterApp: React.FC<MasterAppProps> = ({ onResetMode, canResetMode 
     window.screenflow.getServerStatus().then((status) => {
       setServerStatus(status === 'running' ? 'running' : 'stopped');
     });
-
-    // Poll Moonlight paired clients count for the sidebar badge (every 10s)
-    const refreshMoonlightClients = async () => {
-      try {
-        const list = await window.screenflow.getMoonlightClients();
-        setMoonlightClientsCount(list?.length ?? 0);
-      } catch {
-        // ignore
-      }
-    };
-    refreshMoonlightClients();
-    const moonlightClientsTimer = setInterval(refreshMoonlightClients, 10000);
 
     // Track connected screens count
     const updateScreensCount = async () => {
@@ -224,7 +211,7 @@ export const MasterApp: React.FC<MasterAppProps> = ({ onResetMode, canResetMode 
       unsubDisconnect();
       unsubSignaling();
       stopStreamingEngine();
-      clearInterval(moonlightClientsTimer);
+      unsubScreens();
     };
   }, [streamStatus, selectedScreen, agentScreens]);
 
@@ -529,7 +516,7 @@ export const MasterApp: React.FC<MasterAppProps> = ({ onResetMode, canResetMode 
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-bg-space select-none text-slate-100 h-full w-full relative">
+    <div className="flex-1 flex flex-col overflow-hidden bg-bg-space select-none text-neutral-900 h-full w-full relative">
       <TitleBar subtitle="Transmissor (Master)" />
 
       {/* Main Content Router */}
@@ -537,18 +524,29 @@ export const MasterApp: React.FC<MasterAppProps> = ({ onResetMode, canResetMode 
         {activeTab === 'screens' && <ScreensPanel />}
 
         {activeTab === 'dashboard' && (
-          <Dashboard
-            onStartStream={startStreamingEngine}
-            onStopStream={stopStreamingEngine}
-            onPauseStream={pauseStreamingEngine}
-          />
+          <div className="h-full flex flex-col min-h-0">
+            <div className="flex gap-1 mx-6 mt-5 border-b border-neutral-200 pb-3" role="tablist" aria-label="Painel">
+              {([{ id: 'overview', label: 'Visão geral' }, { id: 'agents', label: 'Agentes conectados' }] as const).map(tab => (
+                <button key={tab.id} type="button" role="tab" aria-selected={panelView === tab.id}
+                  onClick={() => setPanelView(tab.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${panelView === tab.id ? 'bg-neutral-900 text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}>
+                  {tab.label}{tab.id === 'agents' && <span className="ml-2 opacity-70">{connectedAgents.length}</span>}
+                </button>
+              ))}
+            </div>
+            <div className="flex-1 min-h-0" role="tabpanel">
+              {panelView === 'agents' ? <AgentsList /> : <Dashboard
+                onStartStream={startStreamingEngine}
+                onStopStream={stopStreamingEngine}
+                onPauseStream={pauseStreamingEngine}
+              />}
+            </div>
+          </div>
         )}
 
-        {activeTab === 'agents' && <AgentsList />}
 
-        {activeTab === 'moonlight' && <MoonlightPanel />}
 
-        {activeTab === 'network' && <NetworkMonitor />}
+
 
         {activeTab === 'settings' && <Settings />}
       </main>
@@ -560,7 +558,6 @@ export const MasterApp: React.FC<MasterAppProps> = ({ onResetMode, canResetMode 
         serverStatus={serverStatus}
         streamStatus={streamStatus}
         activeAgentsCount={connectedAgents.length}
-        moonlightClientsCount={moonlightClientsCount}
         screensCount={screensCount}
         onStopStream={stopStreamingEngine}
         onStartStream={startStreamingEngine}

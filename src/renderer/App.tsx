@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import type { InstallMode, UpdateInfo } from '../shared/types';
 import { APP_VERSION } from '../shared/constants';
 import MasterApp from './master/MasterApp';
+import { useDisplayStreaming } from './master/displayStreaming';
 import AgentApp from './agent/AgentApp';
 import { TitleBar } from './components/ui/TitleBar';
 import { GlassCard } from './components/ui/GlassCard';
@@ -11,6 +12,10 @@ import neotycUrl from './assets/neotyc.png';
 import nomespaceviewerUrl from './assets/nomespaceviewer.png';
 
 export const App: React.FC = () => {
+  // Android receivers must stream whatever screen is visible (launcher, Master or Agent).
+  // Events are only sent to the main window, so projector windows stay idle.
+  useDisplayStreaming();
+
   const [autoUpdateInfo, setAutoUpdateInfo] = useState<UpdateInfo | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -208,7 +213,7 @@ export const App: React.FC = () => {
 
         <div className="text-center space-y-2 mb-8 max-w-md flex flex-col items-center justify-center">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-800 text-[10px] font-mono uppercase tracking-wider font-bold">
-            SISTEMA HÍBRIDO (LAN & TV)
+            TELAS SEM FIO NA REDE LOCAL
           </div>
           <img src={neotycUrl} alt="Neotyc" className="h-16 object-contain mt-4 mb-2 select-none" />
           <img src={nomespaceviewerUrl} alt="SpaceViewer" className="h-12 object-contain mb-4 select-none" />
@@ -237,13 +242,13 @@ export const App: React.FC = () => {
                   Painel Transmissor (Master)
                 </h3>
                 <p className="text-xs text-neutral-600 mt-2 leading-relaxed">
-                  Transmita a tela deste computador para receptores SpaceViewer locais ou Smart TVs com Moonlight.
+                  Use tablets e celulares com o app SpaceViewer Display como telas extras ou espelhos deste computador.
                 </p>
               </div>
             </div>
 
             <div className="mt-8 font-mono text-[10px] uppercase tracking-wider text-neutral-600 bg-neutral-100 border border-neutral-200 px-4 py-1.5 rounded-full">
-              Iniciar Servidor WebRTC & GameStream
+              Telas estendidas e espelhadas
             </div>
           </GlassCard>
 

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>SpaceViewer Display</title>
+  <link rel="stylesheet" href="receiver.css">
+</head>
+<body data-state="idle">
+  <video id="video" muted playsinline autoplay disablepictureinpicture></video>
+
+  <main id="idle">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+      </div>
+      <div>
+        <div class="product">SpaceViewer Display</div>
+        <div class="tagline">Tela extra sem fio</div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="label">Este aparelho</div>
+      <div id="device-name" class="device-name">—</div>
+
+      <div class="grid">
+        <div>
+          <div class="label">Endereço IP</div>
+          <div id="ip" class="ip">—</div>
+          <div id="ip-extra" class="muted"></div>
+        </div>
+        <div>
+          <div class="label">Porta</div>
+          <div id="port" class="value">47811</div>
+        </div>
+        <div>
+          <div class="label">Resolução</div>
+          <div id="resolution" class="value">—</div>
+        </div>
+      </div>
+
+      <div class="status-row">
+        <span id="status-dot" class="dot"></span>
+        <span id="status" class="status">Aguardando o computador…</span>
+      </div>
+    </section>
+
+    <p class="hint">No PC abra o <strong>SpaceViewer</strong> → <strong>Telas</strong> → <strong>Buscar</strong> e escolha este aparelho.</p>
+    <p class="footer" id="footer"></p>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <pre id="stats" class="stats" hidden></pre>
+
+  <script src="receiver.js"></script>
+</body>
+</html>

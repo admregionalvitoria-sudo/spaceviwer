@@ -1,7 +1,7 @@
 {
   "name": "spaceviewer",
-  "version": "2.2.26",
-  "description": "Screen mirroring and casting over local network",
+  "version": "3.2.1",
+  "description": "Extended and mirrored displays on Android tablets and phones over the local network",
   "repository": {
     "type": "git",
     "url": "https://github.com/admregionalvitoria-sudo/spaceviwer.git"
@@ -13,13 +13,16 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package:win": "npm run build:native && electron-vite build && electron-builder --win",
+    "package:win": "npm run build:native && npm run build:apk && npm run fetch:ffmpeg && electron-vite build && electron-builder --win --publish never && node scripts/sync-installer.cjs",
+    "build:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File android/build-apk.ps1",
+    "clean": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clean-generated.ps1",
+    "fetch:ffmpeg": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-ffmpeg.ps1",
     "package:linux": "electron-vite build && electron-builder --linux",
     "package:mac": "electron-vite build && electron-builder --mac",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-native.ps1",
-    "test:host": "node --test tests/host-regressions.cjs tests/mdns-regressions.cjs"
+    "test:host": "node --test tests/host-regressions.cjs tests/mdns-regressions.cjs tests/capture-regressions.cjs tests/windows-display-regressions.cjs tests/display-receivers-regressions.cjs tests/codec-regressions.cjs tests/native-stream-regressions.cjs tests/congestion-regressions.cjs"
   },
   "dependencies": {
     "bonjour-service": "^1.2.1",

@@ -38,3 +38,11 @@ scratch/
 
 cmake-build-*/
 Sunshine-master/
+resources/sunshine/
+
+# Android receiver build outputs
+dist-apk/
+android/build/
+android/keystore/
+resources/apk/
+resources/ffmpeg/

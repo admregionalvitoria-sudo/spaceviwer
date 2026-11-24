@@ -1,10 +1,17 @@
-// SpaceViewer v2.2.9
+// SpaceViewer v3.1.0
 // ============================================================
-// ScreenFlow — Preload Script (contextBridge)
+// SpaceViewer — Preload Script (contextBridge)
 // ============================================================
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ScreenFlowAPI } from '../shared/types';
+
+/** Subscribes to a main-process event and returns the unsubscribe function. */
+function on<T>(channel: string, cb: (payload: T) => void): () => void {
+  const handler = (_: Electron.IpcRendererEvent, payload: unknown) => cb(payload as T);
+  ipcRenderer.on(channel, handler);
+  return () => ipcRenderer.removeListener(channel, handler);
+}
 
 const api: ScreenFlowAPI = {
   // === SCREENS & APPLICATION PROJECTOR ===
@@ -42,43 +49,34 @@ const api: ScreenFlowAPI = {
   connectToMaster: (info) => ipcRenderer.invoke('connect-to-master', info),
   disconnectFromMaster: () => ipcRenderer.invoke('disconnect-from-master'),
 
-  // === MOONLIGHT / GAMESTREAM (NATIVE SPACEVIWERSTREAM) ===
-  checkSunshine: () => ipcRenderer.invoke('check-sunshine'),
-  startGameStream: () => ipcRenderer.invoke('start-gamestream'),
-  stopGameStream: () => ipcRenderer.invoke('stop-gamestream'),
-  getGameStreamStatus: () => ipcRenderer.invoke('get-gamestream-status'),
-  getHostInfo: () => ipcRenderer.invoke('get-host-info'),
-  pairMoonlightPin: (pin) => ipcRenderer.invoke('pair-moonlight-pin', pin),
+  // === PC DISPLAYS ===
+  listPcDisplays: () => ipcRenderer.invoke('list-pc-displays'),
+  getVirtualDriverState: () => ipcRenderer.invoke('get-virtual-driver-state'),
+  installVirtualDriver: () => ipcRenderer.invoke('install-virtual-driver'),
 
-  // === EXTENDED VIRTUAL DISPLAY & HOST CONTROLS ===
-  getVirtualDisplayStatus: () => ipcRenderer.invoke('get-virtual-display-status'),
-  getVirtualDisplayState: () => ipcRenderer.invoke('get-virtual-display-state'),
-  setVirtualDisplayCount: (count) => ipcRenderer.invoke('set-virtual-display-count', count),
-  addVirtualDisplay: () => ipcRenderer.invoke('add-virtual-display'),
-  removeVirtualDisplay: () => ipcRenderer.invoke('remove-virtual-display'),
-  toggleVirtualDisplays: (enabled) => ipcRenderer.invoke('toggle-virtual-displays', enabled),
-  installVirtualDisplayDriver: () => ipcRenderer.invoke('install-virtual-display-driver'),
-  setDisplayMode: (mode) => ipcRenderer.invoke('set-display-mode', mode),
-  getHostDisplays: () => ipcRenderer.invoke('get-host-displays'),
-  setNativeSessionAudio: (address: string, sourceId: string) => ipcRenderer.invoke('set-native-session-audio', address, sourceId),
-  getNativeAudioStatus: () => ipcRenderer.invoke('get-native-audio-status'),
-  installNativeAudio: () => ipcRenderer.invoke('install-native-audio'),
-  getNativeSessions: () => ipcRenderer.invoke('get-native-sessions'),
-  setNativeSessionDisplay: (address, display) => ipcRenderer.invoke('set-native-session-display', address, display),
-  getHostSettings: () => ipcRenderer.invoke('get-host-settings'),
-  setHostSettings: (settings) => ipcRenderer.invoke('set-host-settings', settings),
-  refreshHostCapture: () => ipcRenderer.invoke('refresh-host-capture'),
+  setDisplayResolution: (deviceName, width, height, refreshRate) =>
+    ipcRenderer.invoke('set-display-resolution', deviceName, width, height, refreshRate),
+  setDisplayPosition: (deviceName, x, y) => ipcRenderer.invoke('set-display-position', deviceName, x, y),
+  setPrimaryDisplay: (deviceName) => ipcRenderer.invoke('set-primary-display', deviceName),
   ensureVirtualCursor: () => ipcRenderer.invoke('ensure-virtual-cursor'),
+  restoreNormalCursor: () => ipcRenderer.invoke('restore-normal-cursor'),
+  getHostInfo: () => ipcRenderer.invoke('get-host-info'),
 
-  // === MOONLIGHT — ADVANCED ===
-  getMoonlightScreens: () => ipcRenderer.invoke('get-moonlight-screens'),
-  setMoonlightScreen: (sourceId) => ipcRenderer.invoke('set-moonlight-screen', sourceId),
-  getMoonlightClients: () => ipcRenderer.invoke('get-moonlight-clients'),
-  getSunshineStreamStats: () => ipcRenderer.invoke('get-sunshine-stream-stats'),
-  getSunshineConfig: () => ipcRenderer.invoke('get-sunshine-config'),
-  setSunshineConfig: (config) => ipcRenderer.invoke('set-sunshine-config', config),
-  removeMoonlightClient: (uuid) => ipcRenderer.invoke('remove-moonlight-client', uuid),
-  discoverSmartTVs: () => ipcRenderer.invoke('discover-smart-tvs'),
+  // === ANDROID RECEIVERS ===
+  listReceivers: () => ipcRenderer.invoke('list-receivers'),
+  scanReceivers: () => ipcRenderer.invoke('scan-receivers'),
+  addReceiverByIp: (ip) => ipcRenderer.invoke('add-receiver-by-ip', ip),
+  setReceiverAssignment: (id, assignment) => ipcRenderer.invoke('set-receiver-assignment', id, assignment),
+  connectReceiver: (id) => ipcRenderer.invoke('connect-receiver', id),
+  disconnectReceiver: (id) => ipcRenderer.invoke('disconnect-receiver', id),
+  applyReceiversMode: (ids, mode, sourceDisplayId) => ipcRenderer.invoke('apply-receivers-mode', ids, mode, sourceDisplayId),
+  disconnectAllReceivers: () => ipcRenderer.invoke('disconnect-all-receivers'),
+  reportReceiverStatus: (receiverId, status, error) => ipcRenderer.send('report-receiver-status', receiverId, status, error),
+  reportReceiverNotice: (receiverId, message) => ipcRenderer.send('report-receiver-notice', receiverId, message),
+
+  // === NATIVE AUDIO ===
+  sendNativeAudio: (chunk: ArrayBuffer) => ipcRenderer.send('native-audio-chunk', chunk),
+  onNativeAudioState: (cb) => on('native-audio-state', cb),
 
   // === SHARED ===
   getInstallMode: () => ipcRenderer.invoke('get-install-mode'),
@@ -87,90 +85,31 @@ const api: ScreenFlowAPI = {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   toggleFullscreen: (state) => ipcRenderer.send('toggle-fullscreen', state),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  openDiagnosticsFolder: () => ipcRenderer.invoke('open-diagnostics-folder'),
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximizeWindow: () => ipcRenderer.send('window-maximize'),
   closeWindow: () => ipcRenderer.send('window-close'),
+
   // === AUTO-UPDATE ===
   checkForUpdates: () => ipcRenderer.invoke('updater:check'),
   downloadAndInstallUpdate: (downloadUrl: string) => ipcRenderer.invoke('updater:download-and-install', downloadUrl),
   applyUpdateAndRestart: () => ipcRenderer.invoke('updater:apply-and-restart'),
-  onUpdateProgress: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, p: unknown) => cb(p as any);
-    ipcRenderer.on('updater:progress', handler);
-    return () => ipcRenderer.removeListener('updater:progress', handler);
-  },
+  onUpdateProgress: (cb) => on('updater:progress', cb),
 
   // === EVENTS ===
-  onUpdateAvailable: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, info: unknown) => cb(info as any);
-    ipcRenderer.on('updater:available-auto', handler);
-    return () => ipcRenderer.removeListener('updater:available-auto', handler);
-  },
-  onScreensChanged: (cb) => {
-    const handler = () => cb();
-    ipcRenderer.on('screens-changed', handler);
-    return () => ipcRenderer.removeListener('screens-changed', handler);
-  },
-  onAgentConnected: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, agent: unknown) => cb(agent as any);
-    ipcRenderer.on('agent-connected', handler);
-    return () => ipcRenderer.removeListener('agent-connected', handler);
-  },
-  onAgentDisconnected: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, id: string) => cb(id);
-    ipcRenderer.on('agent-disconnected', handler);
-    return () => ipcRenderer.removeListener('agent-disconnected', handler);
-  },
-  onStreamStats: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, stats: unknown) => cb(stats as any);
-    ipcRenderer.on('stream-stats', handler);
-    return () => ipcRenderer.removeListener('stream-stats', handler);
-  },
-  onConnectionError: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, err: string) => cb(err);
-    ipcRenderer.on('connection-error', handler);
-    return () => ipcRenderer.removeListener('connection-error', handler);
-  },
-  onMasterDiscovered: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, master: unknown) => cb(master as any);
-    ipcRenderer.on('master-discovered', handler);
-    return () => ipcRenderer.removeListener('master-discovered', handler);
-  },
-  onSignalingMessage: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, msg: unknown) => cb(msg as any);
-    ipcRenderer.on('signaling-message', handler);
-    return () => ipcRenderer.removeListener('signaling-message', handler);
-  },
-  onGameStreamStatus: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, status: unknown) => cb(status as any);
-    ipcRenderer.on('gamestream-status-changed', handler);
-    return () => ipcRenderer.removeListener('gamestream-status-changed', handler);
-  },
-  onAgentDiscovered: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, agent: unknown) => cb(agent as any);
-    ipcRenderer.on('agent-discovered', handler);
-    return () => ipcRenderer.removeListener('agent-discovered', handler);
-  },
-  onForceConnectToMaster: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, master: unknown) => cb(master as any);
-    ipcRenderer.on('force-connect-to-master', handler);
-    return () => ipcRenderer.removeListener('force-connect-to-master', handler);
-  },
-  onMoonlightStreamStats: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, stats: unknown) => cb(stats as any);
-    ipcRenderer.on('moonlight-stream-stats', handler);
-    return () => ipcRenderer.removeListener('moonlight-stream-stats', handler);
-  },
-  onSmartTVsUpdated: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, tvs: unknown) => cb(tvs as any);
-    ipcRenderer.on('smart-tvs-updated', handler);
-    return () => ipcRenderer.removeListener('smart-tvs-updated', handler);
-  },
-  onMoonlightPairingRequested: (cb) => {
-    const handler = (_: Electron.IpcRendererEvent, info: unknown) => cb(info as any);
-    ipcRenderer.on('moonlight-pairing-requested', handler);
-    return () => ipcRenderer.removeListener('moonlight-pairing-requested', handler);
-  },
+  onUpdateAvailable: (cb) => on('updater:available-auto', cb),
+  onScreensChanged: (cb) => on('screens-changed', () => cb()),
+  onAgentConnected: (cb) => on('agent-connected', cb),
+  onAgentDisconnected: (cb) => on('agent-disconnected', cb),
+  onStreamStats: (cb) => on('stream-stats', cb),
+  onConnectionError: (cb) => on('connection-error', cb),
+  onMasterDiscovered: (cb) => on('master-discovered', cb),
+  onSignalingMessage: (cb) => on('signaling-message', cb),
+  onAgentDiscovered: (cb) => on('agent-discovered', cb),
+  onForceConnectToMaster: (cb) => on('force-connect-to-master', cb),
+  onReceiversUpdated: (cb) => on('display-receivers-updated', cb),
+  onDisplaySessionReady: (cb) => on('display-session-ready', cb),
+  onDisplaySessionEnded: (cb) => on('display-session-ended', cb),
 };
 
 contextBridge.exposeInMainWorld('screenflow', api);
