@@ -7,9 +7,9 @@ $dest = Join-Path $root 'resources\ffmpeg'
 $exe = Join-Path $dest 'ffmpeg.exe'
 $stamp = Join-Path $dest 'ffmpeg.sha256'
 
-$version = 'n8.1.3-32-g760d10603e (LGPL)'
-$url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-03-12-50/ffmpeg-n8.1.3-32-g760d10603e-win64-lgpl-8.1.zip'
-$zipSha256 = '0D1CA152675055CA2F79A1BE3A2D6310BAF9508F60E31C5AA19CCDD8082E03BF'
+$version = 'n8.1.3-41-ga8029b6528 (LGPL)'
+$url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-24-12-41/ffmpeg-n8.1.3-41-ga8029b6528-win64-lgpl-8.1.zip'
+$zipSha256 = '2201DF4D6CBDCBBDA9E612645605735821BB4CD0B120A9683F970C4C4E2DE8E4'
 
 function Get-Sha256([string]$Path) {
     $stream = [IO.File]::OpenRead($Path)
